@@ -24,11 +24,21 @@ export const currentUser: User = {
   lifeExperiences: ['Lived abroad in Berlin', 'Ran a supper club'],
   handles: [
     { source: 'instagram', value: '@bryn.jpg' },
-    { source: 'letterboxd', value: 'brynj' },
-    { source: 'strava', value: 'Bryn J' },
-    { source: 'spotify', value: 'brynj' },
+    { source: 'letterboxd', value: 'brynj', dataPulled: true },
+    { source: 'strava', value: 'Bryn J', dataPulled: true },
+    { source: 'spotify', value: 'brynj', dataPulled: true },
+    { source: 'polarsteps', value: 'brynj', dataPulled: true },
   ],
-  profileCompletion: 88,
+  pulled: {
+    spotify: {
+      topArtists: ['Phoebe Bridgers', 'Khruangbin', 'Fleet Foxes', 'Sufjan Stevens'],
+      topGenres: ['Indie folk', 'Indie rock'],
+    },
+    letterboxd: { favorites: ['Perfect Days', 'Past Lives', 'Aftersun'] },
+    strava: { activities: ['Trail running', 'Road cycling'] },
+    polarsteps: { places: ['Lisbon', 'Tokyo', 'Mexico City'] },
+  },
+  profileCompletion: 92,
 };
 
 /** The 18 V1 handle-sharing platforms, with display labels and tint colors. */
@@ -72,14 +82,22 @@ export const connections: Connection[] = [
       lifeExperiences: ['Did a ceramics residency in Japan'],
       handles: [
         { source: 'instagram', value: '@sarahmakes' },
-        { source: 'strava', value: 'Sarah Chen' },
-        { source: 'letterboxd', value: 'sarahc' },
+        { source: 'strava', value: 'Sarah Chen', dataPulled: true },
+        { source: 'letterboxd', value: 'sarahc', dataPulled: true },
+        { source: 'spotify', value: 'sarahc', dataPulled: true },
       ],
-      profileCompletion: 90,
+      pulled: {
+        spotify: { topArtists: ['Fleet Foxes', 'Big Thief'], topGenres: ['Indie folk'] },
+        letterboxd: { favorites: ['Perfect Days', 'Portrait of a Lady on Fire'] },
+        strava: { activities: ['Trail running'] },
+      },
+      recentlyAdded: ['Photography'],
+      profileCompletion: 92,
     },
     method: 'nfc',
     connectionType: 'friend',
     metContext: 'Trail running club, Saturday meetup',
+    mutuals: ['Dana Okafor'],
     sharedContactInfo: ['instagram', 'strava'],
     nudgeCadence: 'monthly',
     lastContacted: '2026-06-10',
@@ -103,14 +121,18 @@ export const connections: Connection[] = [
       travel: ['Mexico City'],
       lifeExperiences: ['Ran a supper club'],
       handles: [
-        { source: 'spotify', value: 'marcusb' },
+        { source: 'spotify', value: 'marcusb', dataPulled: true },
         { source: 'instagram', value: '@marcuscooks' },
       ],
-      profileCompletion: 70,
+      pulled: {
+        spotify: { topArtists: ['Khruangbin', 'Marvin Gaye', 'Hiatus Kaiyote'], topGenres: ['Soul', 'Funk'] },
+      },
+      profileCompletion: 72,
     },
     method: 'sms',
     connectionType: 'friend',
     metContext: 'Dinner party at Dana’s',
+    mutuals: ['Dana Okafor'],
     sharedContactInfo: ['instagram', 'spotify'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -130,12 +152,19 @@ export const connections: Connection[] = [
       certifications: [],
       travel: ['Lisbon'],
       lifeExperiences: [],
-      handles: [{ source: 'instagram', value: '@danaclimbs' }],
-      profileCompletion: 55,
+      handles: [
+        { source: 'instagram', value: '@danaclimbs' },
+        { source: 'spotify', value: 'danao', dataPulled: true },
+      ],
+      pulled: {
+        spotify: { topArtists: ['Fleet Foxes', 'Bon Iver'], topGenres: ['Indie folk'] },
+      },
+      profileCompletion: 60,
     },
     method: 'search',
     connectionType: 'acquaintance',
     metContext: 'Climbing gym',
+    mutuals: ['Marcus Bell', 'Sarah Chen'],
     sharedContactInfo: ['instagram'],
     nudgeCadence: 'quarterly',
     lastContacted: '2026-05-01',
@@ -156,14 +185,21 @@ export const connections: Connection[] = [
       travel: ['Tokyo', 'Mexico City', 'Lisbon'],
       lifeExperiences: ['Backpacked solo through SE Asia'],
       handles: [
-        { source: 'bandsintown', value: 'priyan' },
+        { source: 'bandsintown', value: 'priyan', dataPulled: true },
         { source: 'instagram', value: '@priya.shoots' },
+        { source: 'letterboxd', value: 'priyan', dataPulled: true },
       ],
-      profileCompletion: 80,
+      pulled: {
+        bandsintown: { artists: ['Phoebe Bridgers', 'Beach House'] },
+        letterboxd: { favorites: ['Past Lives', 'Call Me By Your Name'] },
+      },
+      recentlyAdded: ['Running'],
+      profileCompletion: 84,
     },
     method: 'nfc',
     connectionType: 'friend',
     metContext: 'Indie show at Baby’s All Right',
+    mutuals: ['Sarah Chen'],
     sharedContactInfo: ['instagram', 'bandsintown'],
     nudgeCadence: 'weekly',
     lastContacted: '2026-06-20',
@@ -200,15 +236,22 @@ export const newCandidates: Connection[] = [
       travel: ['Lisbon', 'Mexico City'],
       lifeExperiences: ['Bike-toured the Pyrenees'],
       handles: [
-        { source: 'strava', value: 'Theo M' },
+        { source: 'strava', value: 'Theo M', dataPulled: true },
         { source: 'instagram', value: '@theoshoots' },
-        { source: 'letterboxd', value: 'theom' },
+        { source: 'letterboxd', value: 'theom', dataPulled: true },
+        { source: 'spotify', value: 'theom', dataPulled: true },
       ],
-      profileCompletion: 85,
+      pulled: {
+        spotify: { topArtists: ['Khruangbin', 'Tame Impala'], topGenres: ['Indie rock'] },
+        letterboxd: { favorites: ['Aftersun', 'Drive'] },
+        strava: { activities: ['Road cycling'] },
+      },
+      profileCompletion: 88,
     },
     method: 'nfc',
     connectionType: 'friend',
     metContext: 'Saturday group ride',
+    mutuals: ['Sarah Chen'],
     sharedContactInfo: ['strava', 'instagram'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -229,14 +272,21 @@ export const newCandidates: Connection[] = [
       travel: ['Tokyo'],
       lifeExperiences: ['Ran a bookshop pop-up'],
       handles: [
-        { source: 'goodreads', value: 'nadiar' },
+        { source: 'goodreads', value: 'nadiar', dataPulled: true },
         { source: 'instagram', value: '@nadiamakes' },
       ],
-      profileCompletion: 75,
+      pulled: {
+        goodreads: {
+          favorites: ['Tomorrow, and Tomorrow, and Tomorrow'],
+          reading: ['The Overstory'],
+        },
+      },
+      profileCompletion: 78,
     },
     method: 'nfc',
     connectionType: 'friend',
     metContext: 'Book club',
+    mutuals: ['Dana Okafor'],
     sharedContactInfo: ['instagram', 'goodreads'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -245,7 +295,11 @@ export const newCandidates: Connection[] = [
   },
 ];
 
-/** Active nudges for the home screen. */
+/**
+ * Seed time-based nudges. Event-based nudges (when a connection adds something
+ * you share) are generated from each connection's `recentlyAdded` — see
+ * generateEventNudges in src/engine/nudges.ts.
+ */
 export const nudges: Nudge[] = [
   {
     id: 'n1',
@@ -255,15 +309,6 @@ export const nudges: Nudge[] = [
     scheduledDate: '2026-06-27',
     response: null,
     due: true,
-  },
-  {
-    id: 'n2',
-    connectionId: 'sarah',
-    trigger: 'event',
-    message: 'Sarah just added she’s into ceramics — you are too.',
-    scheduledDate: '2026-06-28',
-    response: null,
-    due: false,
   },
 ];
 

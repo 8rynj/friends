@@ -50,6 +50,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="connection/[id]" />
           <Stack.Screen name="edit/[facet]" />
+          <Stack.Screen name="connect" />
+          <Stack.Screen name="claim/[id]" />
           <Stack.Screen name="icebreaker" options={{ presentation: 'modal' }} />
           <Stack.Screen
             name="onboarding/index"

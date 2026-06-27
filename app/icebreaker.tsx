@@ -56,7 +56,7 @@ export default function IcebreakerScreen() {
   const connection =
     useStore((s) => s.connections.find((c) => c.id === String(id))) ?? justBumped;
   // Computed live from both profiles — the engine is the source of truth.
-  const commonalities = computeCommonalities(user, connection.user, 3);
+  const commonalities = computeCommonalities(user, connection.user, 3, connection.connectionType);
 
   // Bump collision — cards fly in from opposite sides and collide (§7).
   const leftX = useSharedValue(reduced ? 0 : -160);

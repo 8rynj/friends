@@ -31,10 +31,13 @@ import {
 import { handleMeta } from '../../src/data/mock';
 import { HandleSource, NudgeCadence } from '../../src/data/types';
 import { computeCommonalities } from '../../src/engine/commonality';
+import { nudgeCopy } from '../../src/engine/nudges';
 import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
+import { ConnectionType } from '../../src/data/types';
 
 const CADENCES: NudgeCadence[] = ['weekly', 'monthly', 'quarterly', 'never'];
+const TYPES: ConnectionType[] = ['friend', 'professional', 'acquaintance', 'romantic'];
 
 /** Maps a shared handle to an outbound deep link (placeholders for V1). */
 function deepLink(source: HandleSource, handle: string): string {
@@ -66,6 +69,7 @@ export default function ConnectionProfileScreen() {
   const connection = useStore((s) => s.connections.find((c) => c.id === String(id)));
   const logOutreach = useStore((s) => s.logOutreach);
   const setCadence = useStore((s) => s.setCadence);
+  const setConnectionType = useStore((s) => s.setConnectionType);
 
   if (!connection) {
     return (
@@ -76,8 +80,9 @@ export default function ConnectionProfileScreen() {
   }
 
   const { user, sharedContactInfo } = connection;
-  // Computed live from both profiles (unlocks retroactively as profiles grow).
-  const commonalities = computeCommonalities(me, user, 5);
+  // Computed live from both profiles (unlocks retroactively as profiles grow);
+  // the connection type tunes which icebreakers surface (V1.5).
+  const commonalities = computeCommonalities(me, user, 5, connection.connectionType);
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(120 + i * 90).springify().damping(16);
 
@@ -173,6 +178,54 @@ export default function ConnectionProfileScreen() {
               })}
             </View>
           </View>
+
+          {/* Connection type — tunes icebreakers, sharing & nudge copy (V1.5). */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={[type.label, { color: colors.textMutedOnLight }]}>Relationship</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {TYPES.map((t) => {
+                const active = connection.connectionType === t;
+                return (
+                  <Pressable
+                    key={t}
+                    onPress={() => {
+                      if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                      setConnectionType(connection.id, t);
+                    }}
+                    style={{
+                      backgroundColor: active ? palette.orange : 'transparent',
+                      borderRadius: 100,
+                      borderWidth: 2,
+                      borderColor: colors.border,
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                    }}
+                  >
+                    <Text style={[type.micro, { color: active ? palette.cream : colors.nearBlack }]}>
+                      {t}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[type.body, { color: colors.textMutedOnLight }]}>
+              Next nudge: “{nudgeCopy(connection.connectionType, user.name)}”
+            </Text>
+          </View>
+
+          {/* Mutual connections (V1.5). */}
+          {connection.mutuals && connection.mutuals.length > 0 && (
+            <View style={{ gap: spacing.sm }}>
+              <Text style={[type.label, { color: colors.textMutedOnLight }]}>
+                {connection.mutuals.length} mutual
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {connection.mutuals.map((m) => (
+                  <Pill key={m} label={m} variant="default" />
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Commonalities — alternating taped, tilted cards (§8). */}
           <View style={{ gap: spacing.md }}>

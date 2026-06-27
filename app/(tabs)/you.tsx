@@ -12,6 +12,7 @@ import {
   Button,
   CollageCard,
   Pill,
+  ProfileQuests,
   ProgressBar,
 } from '../../src/components';
 import { colors, palette, spacing, type } from '../../src/theme';
@@ -73,6 +74,9 @@ export default function YouScreen() {
           </View>
         </CollageCard>
 
+        {/* Gamified deep-profile prompts (V1.5). */}
+        <ProfileQuests user={user} variant="full" />
+
         {/* Editable profile sections. */}
         {SECTIONS.map((section) => {
           const items = (user[section.key] as string[]) ?? [];
@@ -103,15 +107,15 @@ export default function YouScreen() {
           );
         })}
 
-        {/* Connected handles. */}
+        {/* Connected handles — data-pulled ones get a ★ (V1.5). */}
         <View style={{ gap: spacing.sm }}>
-          <Text style={[type.label, { color: colors.textMutedOnLight }]}>Connected</Text>
+          <SectionHeader label="Connected" onEdit={() => router.push('/connect')} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {user.handles.map((h) => (
               <Pill
                 key={h.source}
-                label={handleMeta[h.source].label}
-                variant="source"
+                label={`${handleMeta[h.source].label}${h.dataPulled ? ' ★' : ''}`}
+                variant={h.dataPulled ? 'connected' : 'source'}
                 tint={handleMeta[h.source].tint}
               />
             ))}

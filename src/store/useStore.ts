@@ -12,13 +12,17 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Connection,
+  ConnectionType,
   ContactLogEntry,
+  DataPullSource,
   HandleSource,
   NudgeCadence,
   NudgeResponse,
   User,
 } from '../data/types';
 import { connections as mockConnections, currentUser, nudges as mockNudges } from '../data/mock';
+import { simulatePull } from '../data/datapull';
+import { generateEventNudges } from '../engine/nudges';
 
 /** Spaced-repetition cadence → days until the next nudge (Spec §5D). */
 const CADENCE_DAYS: Record<Exclude<NudgeCadence, 'never'>, number> = {
@@ -86,6 +90,10 @@ interface AppState {
   respondToNudge: (nudgeId: string, response: NudgeResponse) => void;
   /** Change a connection's nudge cadence and reschedule the next nudge. */
   setCadence: (connectionId: string, cadence: NudgeCadence) => void;
+  /** Set a connection's type (filters icebreakers, sharing, nudge copy — V1.5). */
+  setConnectionType: (connectionId: string, type: ConnectionType) => void;
+  /** V1.5: connect a platform and pull (simulated) its signals onto the profile. */
+  connectDataPull: (source: DataPullSource) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -95,7 +103,8 @@ export const useStore = create<AppState>()(
       onboarded: true, // seeded user exists; onboarding edits the same profile
       user: currentUser,
       connections: mockConnections,
-      nudges: mockNudges,
+      // Seed time nudges + generated event nudges (new shared commonalities).
+      nudges: [...mockNudges, ...generateEventNudges(currentUser, mockConnections)],
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
 
@@ -175,10 +184,30 @@ export const useStore = create<AppState>()(
               : c,
           ),
         })),
+
+      setConnectionType: (connectionId, type) =>
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId ? { ...c, connectionType: type } : c,
+          ),
+        })),
+
+      connectDataPull: (source) =>
+        set((s) => {
+          const pulled = { ...s.user.pulled, ...simulatePull(source) };
+          const handles = s.user.handles.some((h) => h.source === source)
+            ? s.user.handles.map((h) =>
+                h.source === source ? { ...h, dataPulled: true } : h,
+              )
+            : [...s.user.handles, { source, value: '', dataPulled: true }];
+          const user = { ...s.user, pulled, handles };
+          user.profileCompletion = computeCompletion(user);
+          return { user };
+        }),
     }),
     {
-      // Bumped to v2 when topHobbies/certifications were added to the profile.
-      name: 'knowable-store-v2',
+      // Bumped to v3 for V1.5 fields (pulled data, mutuals, recentlyAdded).
+      name: 'knowable-store-v3',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,

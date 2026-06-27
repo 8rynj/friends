@@ -36,6 +36,33 @@ export interface Handle {
   value: string;
   /** Whether this handle is shared with a given connection (asymmetrical, §5B). */
   shared?: boolean;
+  /** V1.5: light data pull connected for this platform (Spec §6 / §8). */
+  dataPulled?: boolean;
+}
+
+/** Platforms that support V1.5 light data pull (Spec §6 / §8 Integrations). */
+export type DataPullSource =
+  | 'spotify'
+  | 'letterboxd'
+  | 'goodreads'
+  | 'strava'
+  | 'bandsintown'
+  | 'polarsteps'
+  | 'linkedin';
+
+/**
+ * V1.5 light-data-pull results stored on a profile. In production these come
+ * from each platform's API; here they're simulated, but the shape is the same
+ * so the engine and UI don't change when real pulls land.
+ */
+export interface PulledData {
+  spotify?: { topArtists: string[]; topGenres: string[] };
+  letterboxd?: { favorites: string[] };
+  goodreads?: { favorites: string[]; reading: string[] };
+  strava?: { activities: string[] };
+  bandsintown?: { artists: string[] };
+  polarsteps?: { places: string[] };
+  linkedin?: { title?: string; company?: string; industry?: string };
 }
 
 /**
@@ -82,6 +109,10 @@ export interface User {
   travel: string[];
   lifeExperiences: string[];
   handles: Handle[];
+  /** V1.5: simulated light-data-pull signals, keyed by platform. */
+  pulled?: PulledData;
+  /** V1.5: items recently added to this profile (drives new-commonality nudges). */
+  recentlyAdded?: string[];
   /** 0–100, drives the onboarding/home completion indicator (§5A). */
   profileCompletion: number;
 }
@@ -124,6 +155,8 @@ export interface Connection {
   connectionType: ConnectionType;
   /** Where/when first met — free text for now (event/location context is V2). */
   metContext?: string;
+  /** V1.5: mutual connections, surfaced on the profile (names for now). */
+  mutuals?: string[];
   /** Contact info this user has chosen to share back (asymmetrical, §5B). */
   sharedContactInfo: HandleSource[];
   /**

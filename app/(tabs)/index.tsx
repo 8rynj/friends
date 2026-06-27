@@ -23,6 +23,7 @@ import {
   OutlineText,
   PaperScrap,
   Pill,
+  ProfileQuests,
 } from '../../src/components';
 import {
   cardBackgrounds,
@@ -174,6 +175,9 @@ export default function HomeScreen() {
             </CollageCard>
           </Animated.View>
         )}
+
+        {/* Gamified deep-profile prompt — value left on the table (V1.5). */}
+        <ProfileQuests user={user} variant="home" />
 
         {/* Connections — alternating tilted card backgrounds (§8). */}
         <Text style={[type.headline, { color: colors.nearBlack, marginBottom: spacing.md }]}>
