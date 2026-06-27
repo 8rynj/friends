@@ -1,34 +1,88 @@
 /**
- * Claim flow — V1.5 browser-based claim/preview (Spec §5C, §6).
+ * Claim flow — browser-based claim/preview (Spec §5C, §6 V1.5).
  *
- * When someone invites you, this is the landing page (works in the browser, no
- * app required): it shows the inviter, what you'd have in common, and the value
- * of connecting — BEFORE asking you to download. The teaser commonalities use
- * the same engine as the rest of the app.
+ * Two modes:
+ *  - Pending invite (SMS, Method 2): the recipient sees who invited them
+ *    (the current user) and a value-first CTA; claiming confirms the pending
+ *    connection. This is what Person B lands on from the SMS link.
+ *  - Directory preview: shows an app member who wants to connect, with
+ *    engine-computed teaser commonalities.
+ *
+ * Either way: value is shown before any download is required.
  */
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  Avatar,
   Button,
   CollageCard,
   Hero,
   Pill,
 } from '../../src/components';
 import { cardBackgrounds, colors, palette, spacing, textOn, tiltFor, type } from '../../src/theme';
-import { connections, currentUser, handleMeta, newCandidates } from '../../src/data/mock';
+import { connections as mockConnections, currentUser, directory, handleMeta } from '../../src/data/mock';
 import { computeCommonalities } from '../../src/engine/commonality';
+import { useStore } from '../../src/store/useStore';
 
 function findInviter(id: string) {
-  return [...connections, ...newCandidates].find((c) => c.id === id);
+  return [...mockConnections, ...directory].find((c) => c.id === id);
 }
 
 export default function ClaimScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const inviter = findInviter(String(id));
+  const router = useRouter();
 
+  const me = useStore((s) => s.user);
+  const pending = useStore((s) => s.pendingConnections.find((p) => p.id === String(id)));
+  const claimPending = useStore((s) => s.claimPending);
+
+  // --- Pending-invite mode: recipient sees the inviter (current user). ---
+  if (pending) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.appBg }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+          <Hero
+            eyebrow="Wants to connect with you on Knowable"
+            name={me.name}
+            avatarColor={me.avatarColor}
+            avatarPhoto={me.photo}
+            seed={13}
+          />
+          <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.lg }}>
+            <Text style={[type.headline, { color: colors.nearBlack }]}>
+              {me.name.split(' ')[0]} is into
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {(me.topHobbies.length ? me.topHobbies : me.hobbies).slice(0, 6).map((h) => (
+                <Pill key={h} label={h} variant="connected" />
+              ))}
+            </View>
+            <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+              <Button
+                label="Get Knowable & connect"
+                variant="primary"
+                fullWidth
+                onPress={() => {
+                  const cid = claimPending(pending.id);
+                  if (cid) router.replace(`/connection/${cid}`);
+                }}
+              />
+              <Button label="Maybe later" variant="secondary" fullWidth onPress={() => router.back()} />
+            </View>
+            <Text style={[type.body, { color: colors.textMutedOnLight, textAlign: 'center' }]}>
+              No account needed to preview. Connecting takes 60 seconds.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // --- Directory-preview mode: an app member who wants to connect. ---
+  const inviter = findInviter(String(id));
   if (!inviter) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -38,7 +92,6 @@ export default function ClaimScreen() {
   }
 
   const { user } = inviter;
-  // Teaser of what you'd have in common (value before download).
   const teaser = computeCommonalities(currentUser, user, 3);
 
   return (
@@ -85,7 +138,6 @@ export default function ClaimScreen() {
             </Text>
           )}
 
-          {/* Value-forward CTA before any download. */}
           <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
             <Button label="Get Knowable & connect" variant="primary" fullWidth />
             <Button label="Maybe later" variant="secondary" fullWidth />

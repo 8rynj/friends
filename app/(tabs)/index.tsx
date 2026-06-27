@@ -34,7 +34,7 @@ import {
   tiltFor,
   type,
 } from '../../src/theme';
-import { marqueePhrases, newCandidates } from '../../src/data/mock';
+import { marqueePhrases } from '../../src/data/mock';
 import { commonalityCount } from '../../src/engine/commonality';
 import { isDue, useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
@@ -48,7 +48,9 @@ export default function HomeScreen() {
   const connections = useStore((s) => s.connections);
   const nudges = useStore((s) => s.nudges);
   const respondToNudge = useStore((s) => s.respondToNudge);
-  const addConnection = useStore((s) => s.addConnection);
+  const incomingRequests = useStore((s) => s.incomingRequests);
+  const acceptIncoming = useStore((s) => s.acceptIncoming);
+  const ignoreIncoming = useStore((s) => s.ignoreIncoming);
 
   // Surface the first unresolved nudge, if any.
   const openNudge = nudges.find((n) => n.response === null);
@@ -57,22 +59,6 @@ export default function HomeScreen() {
 
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(i * 70).springify().damping(16);
-
-  // "Bump" the next person the user hasn't connected with yet (NFC stand-in).
-  const bump = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
-    const candidate = newCandidates.find(
-      (cand) => !connections.some((c) => c.id === cand.id),
-    );
-    if (candidate) {
-      addConnection(candidate);
-      router.push(`/icebreaker?id=${candidate.id}`);
-    } else {
-      router.push('/icebreaker');
-    }
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>
@@ -131,6 +117,43 @@ export default function HomeScreen() {
             <Pill label={`${user.profileCompletion}% profile`} variant="default" />
           </View>
         </View>
+
+        {/* Incoming connect requests — accept or ignore (§5B Method 3). */}
+        {incomingRequests.length > 0 && (
+          <View style={{ marginBottom: spacing.xl, gap: spacing.sm }}>
+            <Text style={[type.label, { color: colors.textMutedOnLight }]}>
+              {incomingRequests.length} wants to connect
+            </Text>
+            {incomingRequests.map((req) => (
+              <CollageCard key={req.id} background={palette.cream} rotate="-0.6deg">
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Avatar name={req.connection.user.name} color={req.connection.user.avatarColor} size={44} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.cardTitle, { color: colors.nearBlack }]}>
+                      {req.connection.user.name}
+                    </Text>
+                    {req.note && (
+                      <Text style={[type.body, { color: colors.textMutedOnLight }]} numberOfLines={2}>
+                        “{req.note}”
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 12 }}>
+                  <RequestButton
+                    label="Accept"
+                    primary
+                    onPress={() => {
+                      const cid = acceptIncoming(req.id);
+                      if (cid) router.push(`/icebreaker?id=${cid}`);
+                    }}
+                  />
+                  <RequestButton label="Ignore" onPress={() => ignoreIncoming(req.id)} />
+                </View>
+              </CollageCard>
+            ))}
+          </View>
+        )}
 
         {/* Nudge card — navy, taped, rotated, hard shadow (§8). */}
         {openNudge && nudgeConn && (
@@ -216,13 +239,13 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* FAB — orange, rotated 6° (§8). Bumps a new person → icebreaker. */}
+      {/* FAB — orange, rotated 6° (§8). Opens the connect chooser. */}
       <Fab
         icon="+"
         color={palette.orange}
         rotate="6deg"
         bottom={insets.bottom + 16}
-        onPress={bump}
+        onPress={() => router.push('/add')}
       />
     </View>
   );
@@ -257,6 +280,37 @@ function NudgeResponseButton({
       <Text style={[type.micro, { color: primary ? colors.nearBlack : palette.offWhite }]}>
         {label}
       </Text>
+    </Pressable>
+  );
+}
+
+/** Accept/Ignore button for incoming requests (on a light cream card). */
+function RequestButton({
+  label,
+  primary = false,
+  onPress,
+}: {
+  label: string;
+  primary?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 9,
+        borderRadius: 100,
+        borderWidth: 2,
+        borderColor: colors.border,
+        backgroundColor: primary ? palette.navy : 'transparent',
+      }}
+    >
+      <Text style={[type.micro, { color: primary ? palette.cream : colors.nearBlack }]}>{label}</Text>
     </Pressable>
   );
 }

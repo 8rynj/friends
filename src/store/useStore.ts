@@ -16,13 +16,28 @@ import {
   ContactLogEntry,
   DataPullSource,
   HandleSource,
+  IncomingRequest,
   NudgeCadence,
   NudgeResponse,
+  OutgoingRequest,
+  PendingConnection,
   User,
 } from '../data/types';
-import { connections as mockConnections, currentUser, nudges as mockNudges } from '../data/mock';
+import {
+  connections as mockConnections,
+  currentUser,
+  directory,
+  incomingRequestsSeed,
+  nudges as mockNudges,
+  searchIgnorers,
+} from '../data/mock';
 import { simulatePull } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
+
+/** Result of sending a connect request (Search — Spec §5B Method 3). */
+export type RequestOutcome =
+  | { outcome: 'accepted'; connectionId: string }
+  | { outcome: 'ignored' | 'blocked' | 'already' | 'notfound' };
 
 /** Spaced-repetition cadence → days until the next nudge (Spec §5D). */
 const CADENCE_DAYS: Record<Exclude<NudgeCadence, 'never'>, number> = {
@@ -75,6 +90,12 @@ interface AppState {
   user: User;
   connections: Connection[];
   nudges: import('../data/types').Nudge[];
+  /** Outgoing connect requests (Search — Spec §5B). */
+  outgoingRequests: OutgoingRequest[];
+  /** Incoming connect requests awaiting accept/ignore (§5B). */
+  incomingRequests: IncomingRequest[];
+  /** Pending SMS invites tied to a phone number, 30-day expiry (§5C). */
+  pendingConnections: PendingConnection[];
 
   setHasHydrated: (v: boolean) => void;
   /** Merge a profile patch and recompute completion (onboarding / editing). */
@@ -94,6 +115,20 @@ interface AppState {
   setConnectionType: (connectionId: string, type: ConnectionType) => void;
   /** V1.5: connect a platform and pull (simulated) its signals onto the profile. */
   connectDataPull: (source: DataPullSource) => void;
+
+  // --- Connect flows (Spec §5B/§5C) ---
+  /** Send a connect request to a directory person; resolves by disposition. */
+  sendConnectRequest: (personId: string, note?: string) => RequestOutcome;
+  /** Accept an incoming request → becomes a connection. Returns its id. */
+  acceptIncoming: (requestId: string) => string | undefined;
+  /** Ignore an incoming request. */
+  ignoreIncoming: (requestId: string) => void;
+  /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
+  createPendingInvite: (name: string, phone: string) => string;
+  /** Claim a pending invite → confirmed connection. Returns the connection id. */
+  claimPending: (pendingId: string) => string | undefined;
+  /** Cancel a pending invite. */
+  cancelPending: (pendingId: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -105,6 +140,9 @@ export const useStore = create<AppState>()(
       connections: mockConnections,
       // Seed time nudges + generated event nudges (new shared commonalities).
       nudges: [...mockNudges, ...generateEventNudges(currentUser, mockConnections)],
+      outgoingRequests: [],
+      incomingRequests: incomingRequestsSeed,
+      pendingConnections: [],
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
 
@@ -204,16 +242,116 @@ export const useStore = create<AppState>()(
           user.profileCompletion = computeCompletion(user);
           return { user };
         }),
+
+      sendConnectRequest: (personId, note) => {
+        const s = get();
+        if (s.connections.some((c) => c.id === personId)) return { outcome: 'already' };
+        const person = directory.find((d) => d.id === personId);
+        if (!person) return { outcome: 'notfound' };
+        const existing = s.outgoingRequests.find((r) => r.personId === personId);
+        if (existing?.status === 'blocked') return { outcome: 'blocked' };
+
+        // Mock disposition: ignorers reject; everyone else accepts (§5B Method 3).
+        if (searchIgnorers.includes(personId)) {
+          const attempts = (existing?.attempts ?? 0) + 1;
+          const status: OutgoingRequest['status'] = attempts >= 3 ? 'blocked' : 'ignored';
+          const req: OutgoingRequest = { id: existing?.id ?? genId(), personId, note, attempts, status };
+          set((st) => ({
+            outgoingRequests: existing
+              ? st.outgoingRequests.map((r) => (r.personId === personId ? req : r))
+              : [...st.outgoingRequests, req],
+          }));
+          return { outcome: status };
+        }
+
+        const connection: Connection = {
+          ...person,
+          metContext: note ? `Connected via search · “${note}”` : 'Connected via search',
+        };
+        set((st) => ({
+          connections: [connection, ...st.connections],
+          outgoingRequests: st.outgoingRequests.filter((r) => r.personId !== personId),
+        }));
+        return { outcome: 'accepted', connectionId: personId };
+      },
+
+      acceptIncoming: (requestId) => {
+        const req = get().incomingRequests.find((r) => r.id === requestId);
+        if (!req) return undefined;
+        get().addConnection(req.connection);
+        set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) }));
+        return req.connection.id;
+      },
+
+      ignoreIncoming: (requestId) =>
+        set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) })),
+
+      createPendingInvite: (name, phone) => {
+        const id = genId();
+        const today = todayISO();
+        const pending: PendingConnection = {
+          id,
+          phone,
+          name,
+          createdAt: today,
+          expiresAt: addDaysISO(today, 30),
+          method: 'sms',
+        };
+        set((s) => ({ pendingConnections: [pending, ...s.pendingConnections] }));
+        return id;
+      },
+
+      claimPending: (pendingId) => {
+        const pending = get().pendingConnections.find((p) => p.id === pendingId);
+        if (!pending) return undefined;
+        const id = `claimed-${pendingId}`;
+        const connection: Connection = {
+          id,
+          user: {
+            id,
+            name: pending.name ?? pending.phone,
+            avatarColor: '#1A3A6B',
+            interests: [],
+            hobbies: [],
+            topHobbies: [],
+            bucketList: [],
+            certifications: [],
+            travel: [],
+            lifeExperiences: [],
+            handles: [],
+            profileCompletion: 10,
+          },
+          method: 'sms',
+          connectionType: 'friend',
+          metContext: 'Joined from your invite',
+          sharedContactInfo: [],
+          nudgeCadence: 'monthly',
+          lastContacted: null,
+          nextNudge: null,
+          contactHistory: [],
+        };
+        set((s) => ({
+          connections: [connection, ...s.connections],
+          pendingConnections: s.pendingConnections.filter((p) => p.id !== pendingId),
+        }));
+        return id;
+      },
+
+      cancelPending: (pendingId) =>
+        set((s) => ({ pendingConnections: s.pendingConnections.filter((p) => p.id !== pendingId) })),
     }),
     {
-      // Bumped to v3 for V1.5 fields (pulled data, mutuals, recentlyAdded).
-      name: 'knowable-store-v3',
+      // Bumped to v4 for connect-flow state (requests + pending invites).
+      name: 'knowable-store-v4',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,
         user: s.user,
         connections: s.connections,
         nudges: s.nudges,
+        outgoingRequests: s.outgoingRequests,
+        incomingRequests: s.incomingRequests,
+        pendingConnections: s.pendingConnections,
       }),
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },

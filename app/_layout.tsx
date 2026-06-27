@@ -52,6 +52,9 @@ export default function RootLayout() {
           <Stack.Screen name="edit/[facet]" />
           <Stack.Screen name="connect" />
           <Stack.Screen name="claim/[id]" />
+          <Stack.Screen name="add" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="find" />
+          <Stack.Screen name="invite" />
           <Stack.Screen name="icebreaker" options={{ presentation: 'modal' }} />
           <Stack.Screen
             name="onboarding/index"

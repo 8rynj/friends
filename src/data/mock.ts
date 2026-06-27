@@ -295,6 +295,111 @@ export const newCandidates: Connection[] = [
   },
 ];
 
+/** Builds a not-yet-connected directory person with sensible defaults. */
+function directoryPerson(user: User, mutuals: string[] = []): Connection {
+  return {
+    id: user.id,
+    user,
+    method: 'search',
+    connectionType: 'friend',
+    metContext: 'Found on Knowable',
+    mutuals,
+    sharedContactInfo: user.handles.map((h) => h.source).slice(0, 3),
+    nudgeCadence: 'monthly',
+    lastContacted: null,
+    nextNudge: null,
+    contactHistory: [],
+  };
+}
+
+/**
+ * Searchable directory — people who have the app (Spec §5B Method 3). Includes
+ * the bump candidates plus a few more so search returns results. Already-
+ * connected people are filtered out at search time.
+ */
+export const directory: Connection[] = [
+  ...newCandidates,
+  directoryPerson({
+    id: 'maya',
+    name: 'Maya Lin',
+    avatarColor: palette.navy,
+    interests: ['Photography', 'Cooking', 'Hiking'],
+    hobbies: ['Photography', 'Cooking', 'Hiking'],
+    topHobbies: ['Photography', 'Cooking'],
+    bucketList: ['See the Northern Lights'],
+    certifications: [],
+    travel: ['Tokyo'],
+    lifeExperiences: [],
+    handles: [
+      { source: 'instagram', value: '@mayamakes' },
+      { source: 'spotify', value: 'mayal', dataPulled: true },
+    ],
+    pulled: { spotify: { topArtists: ['Fleet Foxes', 'Sufjan Stevens'], topGenres: ['Indie folk'] } },
+    profileCompletion: 80,
+  }, ['Sarah Chen']),
+  directoryPerson({
+    id: 'liam',
+    name: 'Liam Walsh',
+    avatarColor: palette.yellow,
+    interests: ['Chess', 'Reading'],
+    hobbies: ['Chess', 'Reading'],
+    topHobbies: ['Chess'],
+    bucketList: [],
+    certifications: [],
+    travel: [],
+    lifeExperiences: [],
+    handles: [{ source: 'chesscom', value: 'liamw' }],
+    profileCompletion: 40,
+  }),
+  directoryPerson({
+    id: 'owen',
+    name: 'Owen Reyes',
+    avatarColor: palette.orange,
+    interests: ['Rock climbing', 'Coffee'],
+    hobbies: ['Rock climbing', 'Coffee culture'],
+    topHobbies: ['Rock climbing'],
+    bucketList: ['Learn to surf'],
+    certifications: [],
+    travel: ['Lisbon'],
+    lifeExperiences: [],
+    handles: [{ source: 'instagram', value: '@owenclimbs' }],
+    profileCompletion: 55,
+  }, ['Dana Okafor']),
+];
+
+/**
+ * Directory people who ignore connect requests (mock disposition). Lets the
+ * Search flow demonstrate the ignore / 3-tries / pending-indefinitely logic
+ * (§5B Method 3) self-contained — everyone else accepts.
+ */
+export const searchIgnorers: string[] = ['liam'];
+
+/** Seed incoming connect requests the user can accept or ignore (§5B). */
+export const incomingRequestsSeed: { id: string; connection: Connection; note?: string }[] = [
+  {
+    id: 'req-jess',
+    note: 'We met at the climbing gym — let’s connect!',
+    connection: directoryPerson({
+      id: 'jess',
+      name: 'Jess Park',
+      avatarColor: palette.navy,
+      interests: ['Running', 'Photography', 'Baking'],
+      hobbies: ['Running', 'Photography', 'Baking'],
+      topHobbies: ['Running', 'Photography'],
+      bucketList: ['Run a marathon'],
+      certifications: [],
+      travel: ['Mexico City'],
+      lifeExperiences: [],
+      handles: [
+        { source: 'instagram', value: '@jessruns' },
+        { source: 'strava', value: 'Jess Park', dataPulled: true },
+      ],
+      pulled: { strava: { activities: ['Trail running'] } },
+      profileCompletion: 75,
+    }),
+  },
+];
+
 /**
  * Seed time-based nudges. Event-based nudges (when a connection adds something
  * you share) are generated from each connection's `recentlyAdded` — see

@@ -181,3 +181,25 @@ export interface PendingConnection {
   expiresAt: string; // ISO date (createdAt + 30 days)
   method: ConnectionMethod;
 }
+
+/** Lifecycle of an outgoing connect request (Search — Spec §5B Method 3). */
+export type RequestStatus = 'pending' | 'ignored' | 'blocked' | 'accepted';
+
+/**
+ * An outgoing connect request to a discoverable person. After 3 ignores the
+ * status becomes 'blocked' — pending indefinitely, no further requests (§5B).
+ */
+export interface OutgoingRequest {
+  id: string;
+  personId: string;
+  note?: string;
+  attempts: number;
+  status: RequestStatus;
+}
+
+/** An incoming connect request the user can accept or ignore (§5B Method 3). */
+export interface IncomingRequest {
+  id: string;
+  connection: Connection;
+  note?: string;
+}
