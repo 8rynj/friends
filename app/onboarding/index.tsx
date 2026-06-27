@@ -1,20 +1,25 @@
 /**
  * Onboarding — Design Guidelines §8 (Onboarding, dark mode), Spec §5A.
  *
- * Dark base (#1a1a1a) for a dramatic, editorial first impression. Thin yellow
- * progress bar with %, an eyebrow step label, an uppercase headline with a
- * yellow accent word, gamified steps (name → top-5 hobbies → connect handles),
- * a selection-count badge, and an always-visible muted Skip. Profile completion
- * is communicated as value, never a hard gate (§5A).
+ * Dark base for a dramatic first impression. Four gamified steps:
+ *   1. Name
+ *   2. Pick hobbies — unlimited, from the grouped/searchable catalog
+ *   3. Your Current Top 5 — narrow the selection to 5 highlighted hobbies
+ *   4. Connect handles
+ * Thin yellow progress bar (value left on the table, not a gate — §5A), eyebrow
+ * step label, uppercase headline with a yellow accent word, always-visible Skip.
+ * Persists name / hobbies / topHobbies / handles to the store on finish.
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import {
   Avatar,
   Button,
+  CatalogPicker,
   HalftoneEye,
   HobbyChip,
   OutlineText,
@@ -22,22 +27,17 @@ import {
   ProgressBar,
 } from '../../src/components';
 import { border, colors, fonts, palette, spacing, type } from '../../src/theme';
-import { handleMeta, hobbyPool } from '../../src/data/mock';
+import { handleMeta } from '../../src/data/mock';
+import { hobbyCatalog } from '../../src/data/catalog';
 import { HandleSource } from '../../src/data/types';
 import { useStore } from '../../src/store/useStore';
 
-const MAX_HOBBIES = 5;
+const MAX_TOP = 5;
 const HANDLE_OPTIONS: HandleSource[] = [
-  'instagram',
-  'spotify',
-  'letterboxd',
-  'strava',
-  'linkedin',
-  'goodreads',
-  'snapchat',
-  'bandsintown',
+  'instagram', 'spotify', 'letterboxd', 'strava',
+  'linkedin', 'goodreads', 'snapchat', 'bandsintown',
 ];
-const CHIP_COLORS = [palette.navy, palette.yellow, palette.orange];
+const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -49,24 +49,28 @@ export default function OnboardingScreen() {
   // Prefill from the existing profile so this doubles as profile editing.
   const [name, setName] = useState(user.name ?? '');
   const [hobbies, setHobbies] = useState<string[]>(user.hobbies ?? []);
+  const [topHobbies, setTopHobbies] = useState<string[]>(user.topHobbies ?? []);
   const [handles, setHandles] = useState<HandleSource[]>(
     (user.handles ?? []).map((h) => h.source),
   );
 
-  const totalSteps = 3;
   const percent = useMemo(() => {
     let done = 0;
     if (name.trim()) done += 1;
     if (hobbies.length >= 3) done += 1;
+    if (topHobbies.length >= 1) done += 1;
     if (handles.length >= 1) done += 1;
-    return Math.round((done / totalSteps) * 100);
-  }, [name, hobbies, handles]);
+    return Math.round((done / TOTAL_STEPS) * 100);
+  }, [name, hobbies, topHobbies, handles]);
 
   const toggleHobby = (h: string) =>
-    setHobbies((prev) =>
+    setHobbies((prev) => (prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]));
+
+  const toggleTop = (h: string) =>
+    setTopHobbies((prev) =>
       prev.includes(h)
         ? prev.filter((x) => x !== h)
-        : prev.length >= MAX_HOBBIES
+        : prev.length >= MAX_TOP
           ? prev
           : [...prev, h],
     );
@@ -75,16 +79,20 @@ export default function OnboardingScreen() {
     setHandles((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
 
   const finish = () => {
-    // Persist the profile. Preserve existing handle values where we already
-    // have them; new sources are stored with an empty value for now.
+    // Keep top hobbies a subset of selected hobbies.
+    const top = topHobbies.filter((h) => hobbies.includes(h));
     const merged = handles.map(
-      (source) =>
-        user.handles.find((h) => h.source === source) ?? { source, value: '' },
+      (source) => user.handles.find((h) => h.source === source) ?? { source, value: '' },
     );
-    completeProfile({ name: name.trim() || user.name, hobbies, handles: merged });
+    completeProfile({
+      name: name.trim() || user.name,
+      hobbies,
+      topHobbies: top,
+      handles: merged,
+    });
     router.replace('/(tabs)');
   };
-  const next = () => (step < totalSteps - 1 ? setStep(step + 1) : finish());
+  const next = () => (step < TOTAL_STEPS - 1 ? setStep(step + 1) : finish());
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBgDark }}>
@@ -94,7 +102,7 @@ export default function OnboardingScreen() {
         {/* Progress + step label. */}
         <ProgressBar percent={percent} />
         <Text style={[type.label, { color: palette.yellow, marginTop: spacing.lg }]}>
-          Step {step + 1} of {totalSteps}
+          Step {step + 1} of {TOTAL_STEPS}
         </Text>
 
         <ScrollView
@@ -141,33 +149,63 @@ export default function OnboardingScreen() {
                 </OutlineText>
               </View>
               <Text style={[type.body, { color: colors.textMutedOnDark }]}>
-                Choose up to {MAX_HOBBIES}. These power your icebreakers.
+                Choose anything you’re into — the more the better. You’ll pick your top 5 next.
               </Text>
               <View style={{ alignSelf: 'flex-start', marginVertical: 4 }}>
-                <Pill
-                  label={
-                    hobbies.length < MAX_HOBBIES
-                      ? `${hobbies.length} of ${MAX_HOBBIES} — pick ${MAX_HOBBIES - hobbies.length} more`
-                      : `${MAX_HOBBIES} of ${MAX_HOBBIES} — nice`
-                  }
-                  variant="connected"
-                />
+                <Pill label={`${hobbies.length} selected`} variant="connected" />
               </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {hobbyPool.map((h, i) => (
-                  <HobbyChip
-                    key={h}
-                    label={h}
-                    selected={hobbies.includes(h)}
-                    selectedColor={CHIP_COLORS[i % CHIP_COLORS.length]}
-                    onToggle={() => toggleHobby(h)}
-                  />
-                ))}
-              </View>
+              <CatalogPicker
+                sections={hobbyCatalog}
+                selected={hobbies}
+                onToggle={toggleHobby}
+                onDark
+              />
             </Animated.View>
           )}
 
           {step === 2 && (
+            <Animated.View entering={FadeIn} style={{ gap: spacing.md }}>
+              <View>
+                <Text style={[type.display, { color: palette.offWhite }]}>Your current</Text>
+                <OutlineText fontSize={34} stroke={palette.yellow} strokeWidth={2}>
+                  top 5
+                </OutlineText>
+              </View>
+              <Text style={[type.body, { color: colors.textMutedOnDark }]}>
+                Which of these are you most into right now? These get top billing in your icebreakers.
+              </Text>
+              <View style={{ alignSelf: 'flex-start', marginVertical: 4 }}>
+                <Pill
+                  label={
+                    topHobbies.length < MAX_TOP
+                      ? `${topHobbies.length} of ${MAX_TOP} — pick ${MAX_TOP - topHobbies.length} more`
+                      : `${MAX_TOP} of ${MAX_TOP} — nice`
+                  }
+                  variant="connected"
+                />
+              </View>
+              {hobbies.length === 0 ? (
+                <Text style={[type.body, { color: colors.textMutedOnDark }]}>
+                  Go back and pick a few hobbies first.
+                </Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {hobbies.map((h) => (
+                    <HobbyChip
+                      key={h}
+                      label={h}
+                      selected={topHobbies.includes(h)}
+                      selectedColor={palette.yellow}
+                      onDark
+                      onToggle={() => toggleTop(h)}
+                    />
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          )}
+
+          {step === 3 && (
             <Animated.View entering={FadeIn} style={{ gap: spacing.md }}>
               <View>
                 <Text style={[type.display, { color: palette.offWhite }]}>Connect your</Text>
@@ -182,7 +220,10 @@ export default function OnboardingScreen() {
                 {HANDLE_OPTIONS.map((s) => (
                   <Pressable
                     key={s}
-                    onPress={() => toggleHandle(s)}
+                    onPress={() => {
+                      if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                      toggleHandle(s);
+                    }}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -214,14 +255,14 @@ export default function OnboardingScreen() {
         {/* CTAs — primary continue + always-visible muted Skip (§5A, §8). */}
         <View style={{ gap: spacing.sm, paddingBottom: insets.bottom + 16 }}>
           <Button
-            label={step < totalSteps - 1 ? 'Continue' : 'Start connecting'}
+            label={step < TOTAL_STEPS - 1 ? 'Continue' : 'Start connecting'}
             variant="cta"
             fullWidth
             onPress={next}
           />
           <Pressable onPress={next} style={{ alignSelf: 'center', paddingVertical: 8 }}>
             <Text style={[type.label, { color: colors.textMutedOnDark }]}>
-              {step < totalSteps - 1 ? 'Skip for now' : 'Finish later'}
+              {step < TOTAL_STEPS - 1 ? 'Skip for now' : 'Finish later'}
             </Text>
           </Pressable>
         </View>

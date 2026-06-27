@@ -40,6 +40,7 @@ import {
   type,
 } from '../src/theme';
 import { justBumped, handleMeta } from '../src/data/mock';
+import { computeCommonalities } from '../src/engine/commonality';
 import { useStore } from '../src/store/useStore';
 import { useReducedMotion } from '../src/hooks/useReducedMotion';
 
@@ -54,7 +55,8 @@ export default function IcebreakerScreen() {
   // fall back to the sample connection when opened without an id.
   const connection =
     useStore((s) => s.connections.find((c) => c.id === String(id))) ?? justBumped;
-  const commonalities = connection.commonalities.slice(0, 3);
+  // Computed live from both profiles — the engine is the source of truth.
+  const commonalities = computeCommonalities(user, connection.user, 3);
 
   // Bump collision — cards fly in from opposite sides and collide (§7).
   const leftX = useSharedValue(reduced ? 0 : -160);

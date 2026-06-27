@@ -74,7 +74,11 @@ export interface User {
   avatarColor?: string;
   interests: string[];
   hobbies: string[];
+  /** The current top 5 (subset of hobbies); weighted highest by the engine. */
+  topHobbies: string[];
   bucketList: string[];
+  /** Certifications & skills (e.g. "Personal Trainer (CPT)"). */
+  certifications: string[];
   travel: string[];
   lifeExperiences: string[];
   handles: Handle[];
@@ -122,7 +126,11 @@ export interface Connection {
   metContext?: string;
   /** Contact info this user has chosen to share back (asymmetrical, §5B). */
   sharedContactInfo: HandleSource[];
-  commonalities: Commonality[];
+  /**
+   * Optional seed commonalities. Screens compute these dynamically from the two
+   * profiles via the commonality engine, so this is no longer the source of truth.
+   */
+  commonalities?: Commonality[];
   nudgeCadence: NudgeCadence;
   /** ISO date of last confirmed outreach, or null if never. */
   lastContacted: string | null;

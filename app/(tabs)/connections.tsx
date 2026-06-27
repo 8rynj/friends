@@ -21,6 +21,7 @@ import {
   tiltFor,
   type,
 } from '../../src/theme';
+import { commonalityCount } from '../../src/engine/commonality';
 import { useStore } from '../../src/store/useStore';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -33,6 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
 export default function ConnectionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const me = useStore((s) => s.user);
   const connections = useStore((s) => s.connections);
 
   return (
@@ -78,7 +80,7 @@ export default function ConnectionsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[type.cardTitle, { color: fg }]}>{c.user.name}</Text>
                   <Text style={[type.body, { color: muted }]} numberOfLines={1}>
-                    {c.commonalities.length} in common · {c.metContext}
+                    {commonalityCount(me, c.user)} in common · {c.metContext}
                   </Text>
                 </View>
                 <Pill label={TYPE_LABEL[c.connectionType]} variant="default" />

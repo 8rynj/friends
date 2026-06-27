@@ -1,14 +1,11 @@
 /**
- * Mock data for the first build. Realistic sample content so the screens read
- * like the real product. Replace with API/persistence in a later milestone.
+ * Mock data for the first builds. Profiles use catalog vocabulary
+ * (src/data/catalog.ts) so the commonality engine produces strong, realistic
+ * matches. Commonalities are no longer hand-written — they're computed from
+ * these profiles by src/engine/commonality.ts.
  */
 import { palette } from '../theme/colors';
-import {
-  Connection,
-  HandleSource,
-  Nudge,
-  User,
-} from './types';
+import { Connection, HandleSource, Nudge, User } from './types';
 
 /** The signed-in user. */
 export const currentUser: User = {
@@ -16,8 +13,13 @@ export const currentUser: User = {
   name: 'Bryn Jorgensen',
   avatarColor: palette.orange,
   interests: ['Film', 'Running', 'Vinyl'],
-  hobbies: ['Bouldering', 'Film photography', 'Cooking', 'Vinyl collecting', 'Trail running'],
-  bucketList: ['See the northern lights', 'Run a marathon', 'Learn to surf'],
+  hobbies: [
+    'Photography', 'Running', 'Cooking', 'Collecting vinyl records',
+    'Rock climbing', 'Watching movies', 'Coffee culture',
+  ],
+  topHobbies: ['Photography', 'Running', 'Cooking', 'Rock climbing', 'Collecting vinyl records'],
+  bucketList: ['Run a marathon', 'See the Northern Lights', 'Learn to surf'],
+  certifications: ['First Aid / CPR'],
   travel: ['Lisbon', 'Mexico City', 'Tokyo'],
   lifeExperiences: ['Lived abroad in Berlin', 'Ran a supper club'],
   handles: [
@@ -26,7 +28,7 @@ export const currentUser: User = {
     { source: 'strava', value: 'Bryn J' },
     { source: 'spotify', value: 'brynj' },
   ],
-  profileCompletion: 72,
+  profileCompletion: 88,
 };
 
 /** The 18 V1 handle-sharing platforms, with display labels and tint colors. */
@@ -54,30 +56,6 @@ export const handleMeta: Record<
   steam: { label: 'Steam', tint: '#1B2838' },
 };
 
-/** Hobby pool for onboarding (narrow to top 5, §5A). */
-export const hobbyPool: string[] = [
-  'Bouldering',
-  'Film photography',
-  'Vinyl collecting',
-  'Trail running',
-  'Cooking',
-  'Pottery',
-  'Cycling',
-  'Live music',
-  'Reading',
-  'Hiking',
-  'Board games',
-  'Coffee',
-  'Surfing',
-  'Painting',
-  'Yoga',
-  'Chess',
-  'Gardening',
-  'Baking',
-  'Travel',
-  'Thrifting',
-];
-
 export const connections: Connection[] = [
   {
     id: 'sarah',
@@ -85,9 +63,11 @@ export const connections: Connection[] = [
       id: 'sarah',
       name: 'Sarah Chen',
       avatarColor: palette.navy,
-      interests: ['Ceramics', 'Trail running', 'Film'],
-      hobbies: ['Pottery', 'Trail running', 'Film photography'],
-      bucketList: ['Thru-hike the PCT'],
+      interests: ['Ceramics', 'Running', 'Film'],
+      hobbies: ['Pottery / ceramics', 'Running', 'Photography', 'Hiking'],
+      topHobbies: ['Pottery / ceramics', 'Running', 'Photography'],
+      bucketList: ['Hike the Pacific Crest Trail', 'Run a marathon'],
+      certifications: [],
       travel: ['Tokyo', 'Lisbon'],
       lifeExperiences: ['Did a ceramics residency in Japan'],
       handles: [
@@ -104,28 +84,6 @@ export const connections: Connection[] = [
     nudgeCadence: 'monthly',
     lastContacted: '2026-06-10',
     nextNudge: '2026-06-28',
-    commonalities: [
-      {
-        id: 'c1',
-        category: 'Fitness',
-        title: 'You both trail run',
-        detail: 'Sarah logged 32km on Strava this week — ask about her route.',
-        source: 'strava',
-      },
-      {
-        id: 'c2',
-        category: 'Film',
-        title: 'Both love slow cinema',
-        detail: 'You both five-starred "Perfect Days" on Letterboxd.',
-        source: 'letterboxd',
-      },
-      {
-        id: 'c3',
-        category: 'Travel',
-        title: 'Both spent time in Tokyo',
-        detail: 'Sarah did a ceramics residency there.',
-      },
-    ],
     contactHistory: [
       { id: 'h1', date: '2026-06-10', via: 'instagram', note: 'Sent her a trail rec' },
       { id: 'h2', date: '2026-05-22', via: 'strava' },
@@ -138,15 +96,17 @@ export const connections: Connection[] = [
       name: 'Marcus Bell',
       avatarColor: palette.yellow,
       interests: ['Vinyl', 'Cooking', 'Chess'],
-      hobbies: ['Vinyl collecting', 'Cooking', 'Chess'],
-      bucketList: ['Open a record store'],
+      hobbies: ['Collecting vinyl records', 'Cooking', 'Chess'],
+      topHobbies: ['Collecting vinyl records', 'Cooking', 'Chess'],
+      bucketList: ['Start a blog or YouTube channel'],
+      certifications: ['Bartending / Mixology'],
       travel: ['Mexico City'],
       lifeExperiences: ['Ran a supper club'],
       handles: [
         { source: 'spotify', value: 'marcusb' },
         { source: 'instagram', value: '@marcuscooks' },
       ],
-      profileCompletion: 65,
+      profileCompletion: 70,
     },
     method: 'sms',
     connectionType: 'friend',
@@ -155,20 +115,6 @@ export const connections: Connection[] = [
     nudgeCadence: 'monthly',
     lastContacted: null,
     nextNudge: '2026-06-27',
-    commonalities: [
-      {
-        id: 'c4',
-        category: 'Music',
-        title: 'Both collect vinyl',
-        detail: 'Marcus shares your taste in 70s soul on Spotify.',
-        source: 'spotify',
-      },
-      {
-        id: 'c5',
-        category: 'Food',
-        title: 'You both host supper clubs',
-      },
-    ],
     contactHistory: [],
   },
   {
@@ -178,12 +124,14 @@ export const connections: Connection[] = [
       name: 'Dana Okafor',
       avatarColor: palette.orange,
       interests: ['Bouldering', 'Coffee', 'Reading'],
-      hobbies: ['Bouldering', 'Coffee', 'Reading'],
-      bucketList: ['Climb in Fontainebleau'],
+      hobbies: ['Rock climbing', 'Coffee culture', 'Reading'],
+      topHobbies: ['Rock climbing', 'Coffee culture', 'Reading'],
+      bucketList: ['Learn to surf'],
+      certifications: [],
       travel: ['Lisbon'],
       lifeExperiences: [],
       handles: [{ source: 'instagram', value: '@danaclimbs' }],
-      profileCompletion: 48,
+      profileCompletion: 55,
     },
     method: 'search',
     connectionType: 'acquaintance',
@@ -192,17 +140,7 @@ export const connections: Connection[] = [
     nudgeCadence: 'quarterly',
     lastContacted: '2026-05-01',
     nextNudge: '2026-07-15',
-    commonalities: [
-      {
-        id: 'c6',
-        category: 'Fitness',
-        title: 'You both boulder',
-        detail: 'Dana wants to climb in Fontainebleau — so do you.',
-      },
-    ],
-    contactHistory: [
-      { id: 'h3', date: '2026-05-01', via: 'instagram' },
-    ],
+    contactHistory: [{ id: 'h3', date: '2026-05-01', via: 'instagram' }],
   },
   {
     id: 'priya',
@@ -211,8 +149,10 @@ export const connections: Connection[] = [
       name: 'Priya Nair',
       avatarColor: palette.navy,
       interests: ['Live music', 'Travel', 'Photography'],
-      hobbies: ['Live music', 'Travel', 'Film photography'],
-      bucketList: ['See a show in every borough'],
+      hobbies: ['Attending concerts', 'Travel', 'Photography'],
+      topHobbies: ['Attending concerts', 'Photography', 'Travel'],
+      bucketList: ['Attend a major music festival'],
+      certifications: [],
       travel: ['Tokyo', 'Mexico City', 'Lisbon'],
       lifeExperiences: ['Backpacked solo through SE Asia'],
       handles: [
@@ -228,28 +168,7 @@ export const connections: Connection[] = [
     nudgeCadence: 'weekly',
     lastContacted: '2026-06-20',
     nextNudge: '2026-06-29',
-    commonalities: [
-      {
-        id: 'c7',
-        category: 'Music',
-        title: 'Both into live shows',
-        detail: 'Priya has 3 upcoming shows on Bandsintown.',
-        source: 'bandsintown',
-      },
-      {
-        id: 'c8',
-        category: 'Photography',
-        title: 'Both shoot film',
-      },
-      {
-        id: 'c9',
-        category: 'Travel',
-        title: 'Both spent time in Lisbon',
-      },
-    ],
-    contactHistory: [
-      { id: 'h4', date: '2026-06-20', via: 'instagram' },
-    ],
+    contactHistory: [{ id: 'h4', date: '2026-06-20', via: 'instagram' }],
   },
 ];
 
@@ -258,7 +177,7 @@ export function getConnection(id: string): Connection | undefined {
   return connections.find((c) => c.id === id);
 }
 
-/** The connection surfaced on the icebreaker / post-bump screen. */
+/** The connection surfaced on the icebreaker / post-bump screen by default. */
 export const justBumped: Connection = connections[0];
 
 /**
@@ -274,8 +193,10 @@ export const newCandidates: Connection[] = [
       name: 'Theo Martins',
       avatarColor: palette.navy,
       interests: ['Cycling', 'Coffee', 'Film'],
-      hobbies: ['Cycling', 'Coffee', 'Film photography'],
-      bucketList: ['Ride a Grand Tour stage'],
+      hobbies: ['Cycling', 'Coffee culture', 'Photography'],
+      topHobbies: ['Cycling', 'Photography', 'Coffee culture'],
+      bucketList: ['Ski in the Alps'],
+      certifications: [],
       travel: ['Lisbon', 'Mexico City'],
       lifeExperiences: ['Bike-toured the Pyrenees'],
       handles: [
@@ -292,11 +213,6 @@ export const newCandidates: Connection[] = [
     nudgeCadence: 'monthly',
     lastContacted: null,
     nextNudge: null,
-    commonalities: [
-      { id: 't1', category: 'Fitness', title: 'You both ride', detail: 'Theo logged a century on Strava last weekend.', source: 'strava' },
-      { id: 't2', category: 'Film', title: 'Both shoot film', source: 'letterboxd' },
-      { id: 't3', category: 'Travel', title: 'Both spent time in Lisbon' },
-    ],
     contactHistory: [],
   },
   {
@@ -306,15 +222,17 @@ export const newCandidates: Connection[] = [
       name: 'Nadia Rahman',
       avatarColor: palette.orange,
       interests: ['Reading', 'Pottery', 'Coffee'],
-      hobbies: ['Reading', 'Pottery', 'Coffee'],
-      bucketList: ['Write a novel'],
+      hobbies: ['Reading', 'Pottery / ceramics', 'Coffee culture'],
+      topHobbies: ['Reading', 'Pottery / ceramics', 'Coffee culture'],
+      bucketList: ['Write a book'],
+      certifications: ['Tutor'],
       travel: ['Tokyo'],
       lifeExperiences: ['Ran a bookshop pop-up'],
       handles: [
         { source: 'goodreads', value: 'nadiar' },
         { source: 'instagram', value: '@nadiamakes' },
       ],
-      profileCompletion: 70,
+      profileCompletion: 75,
     },
     method: 'nfc',
     connectionType: 'friend',
@@ -323,10 +241,6 @@ export const newCandidates: Connection[] = [
     nudgeCadence: 'monthly',
     lastContacted: null,
     nextNudge: null,
-    commonalities: [
-      { id: 'na1', category: 'Books', title: 'Both avid readers', detail: 'Nadia is currently reading the same book as you.', source: 'goodreads' },
-      { id: 'na2', category: 'Craft', title: 'You both do pottery' },
-    ],
     contactHistory: [],
   },
 ];

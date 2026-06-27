@@ -34,6 +34,7 @@ import {
   type,
 } from '../../src/theme';
 import { marqueePhrases, newCandidates } from '../../src/data/mock';
+import { commonalityCount } from '../../src/engine/commonality';
 import { isDue, useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 
@@ -199,7 +200,7 @@ export default function HomeScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[type.cardTitle, { color: fg }]}>{c.user.name}</Text>
                       <Text style={[type.body, { color: muted }]} numberOfLines={1}>
-                        {c.commonalities.length} in common · {c.metContext}
+                        {commonalityCount(user, c.user)} in common · {c.metContext}
                       </Text>
                     </View>
                     {isDue(c.nextNudge) && <Pill label="Due" variant="due" />}

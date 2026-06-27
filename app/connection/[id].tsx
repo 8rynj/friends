@@ -30,6 +30,7 @@ import {
 } from '../../src/theme';
 import { handleMeta } from '../../src/data/mock';
 import { HandleSource, NudgeCadence } from '../../src/data/types';
+import { computeCommonalities } from '../../src/engine/commonality';
 import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 
@@ -61,6 +62,7 @@ export default function ConnectionProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
+  const me = useStore((s) => s.user);
   const connection = useStore((s) => s.connections.find((c) => c.id === String(id)));
   const logOutreach = useStore((s) => s.logOutreach);
   const setCadence = useStore((s) => s.setCadence);
@@ -73,7 +75,9 @@ export default function ConnectionProfileScreen() {
     );
   }
 
-  const { user, commonalities, sharedContactInfo } = connection;
+  const { user, sharedContactInfo } = connection;
+  // Computed live from both profiles (unlocks retroactively as profiles grow).
+  const commonalities = computeCommonalities(me, user, 5);
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(120 + i * 90).springify().damping(16);
 

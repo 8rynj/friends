@@ -46,13 +46,24 @@ export function computeCompletion(u: User): number {
   const checks = [
     !!u.name?.trim(),
     u.hobbies.length >= 3,
+    (u.topHobbies?.length ?? 0) >= 1,
     u.handles.length >= 1,
     u.bucketList.length >= 1,
+    (u.certifications?.length ?? 0) >= 1,
     u.travel.length >= 1,
     u.lifeExperiences.length >= 1,
   ];
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
+
+/** Profile array facets an editor can update. */
+export type FacetKey =
+  | 'hobbies'
+  | 'topHobbies'
+  | 'bucketList'
+  | 'certifications'
+  | 'travel'
+  | 'lifeExperiences';
 
 interface AppState {
   hasHydrated: boolean;
@@ -64,6 +75,8 @@ interface AppState {
   setHasHydrated: (v: boolean) => void;
   /** Merge a profile patch and recompute completion (onboarding / editing). */
   completeProfile: (patch: Partial<User>) => void;
+  /** Replace a single array facet and recompute completion (profile editors). */
+  updateFacet: (key: FacetKey, items: string[]) => void;
   /** Add a connection if not already present (the bump / connect result). */
   addConnection: (c: Connection) => void;
   isConnected: (id: string) => boolean;
@@ -91,6 +104,17 @@ export const useStore = create<AppState>()(
           const user = { ...s.user, ...patch };
           user.profileCompletion = computeCompletion(user);
           return { user, onboarded: true };
+        }),
+
+      updateFacet: (key, items) =>
+        set((s) => {
+          const user = { ...s.user, [key]: items };
+          // Keep topHobbies a subset of hobbies if hobbies shrink.
+          if (key === 'hobbies') {
+            user.topHobbies = (s.user.topHobbies ?? []).filter((h) => items.includes(h));
+          }
+          user.profileCompletion = computeCompletion(user);
+          return { user };
         }),
 
       addConnection: (c) =>
@@ -153,7 +177,8 @@ export const useStore = create<AppState>()(
         })),
     }),
     {
-      name: 'knowable-store-v1',
+      // Bumped to v2 when topHobbies/certifications were added to the profile.
+      name: 'knowable-store-v2',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,

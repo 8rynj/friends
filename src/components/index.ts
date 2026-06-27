@@ -14,3 +14,5 @@ export * from './OutlineText';
 export * from './ProgressBar';
 export * from './HobbyChip';
 export * from './Fab';
+export * from './CatalogPicker';
+export * from './FreeTextListEditor';

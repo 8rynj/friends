@@ -14,6 +14,8 @@ interface HobbyChipProps {
   onToggle: () => void;
   /** Brand color used when selected; cycles for visual variety. */
   selectedColor?: string;
+  /** Render on a dark background (onboarding). Defaults to dark. */
+  onDark?: boolean;
 }
 
 export function HobbyChip({
@@ -21,12 +23,15 @@ export function HobbyChip({
   selected,
   onToggle,
   selectedColor = palette.navy,
+  onDark = true,
 }: HobbyChipProps) {
+  const unselectedFg = onDark ? 'rgba(245,240,232,0.7)' : colors.nearBlack;
+  const unselectedBorder = onDark ? 'rgba(245,240,232,0.25)' : colors.border;
   const fg = selected
     ? selectedColor === palette.yellow
       ? colors.nearBlack
       : palette.offWhite
-    : 'rgba(245,240,232,0.7)';
+    : unselectedFg;
 
   return (
     <Pressable
@@ -40,7 +45,7 @@ export function HobbyChip({
         backgroundColor: selected ? selectedColor : 'transparent',
         borderRadius: radii.pill,
         borderWidth: border.small,
-        borderColor: selected ? colors.border : 'rgba(245,240,232,0.25)',
+        borderColor: selected ? colors.border : unselectedBorder,
         paddingVertical: 10,
         paddingHorizontal: 16,
       }}
