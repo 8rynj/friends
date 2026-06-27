@@ -13,9 +13,11 @@
       "resizeMode": "contain"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.knowable.app"
     },
     "android": {
+      "package": "com.knowable.app",
       "adaptiveIcon": {
         "backgroundColor": "#1A3A6B",
         "foregroundImage": "./assets/android-icon-foreground.png",
