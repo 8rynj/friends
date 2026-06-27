@@ -1,0 +1,142 @@
+/**
+ * Knowable data model — mirrors Spec Sheet §8 "Data Model — Key Entities".
+ *
+ * These types are shaped now to accommodate later backend/auth/NFC work without
+ * a painful retrofit. In particular `connectionType` is modeled in V1 even
+ * though the feature ships in V1.5 — the spec explicitly warns against
+ * retrofitting it later (§8, Known Risks).
+ *
+ * This first build is mock-data only; nothing here is persisted yet.
+ */
+
+/** The 18 V1 handle-sharing platforms (Spec §4 / §8 Integrations). */
+export type HandleSource =
+  | 'instagram'
+  | 'snapchat'
+  | 'linkedin'
+  | 'spotify'
+  | 'letterboxd'
+  | 'facebook'
+  | 'twitter'
+  | 'tiktok'
+  | 'goodreads'
+  | 'strava'
+  | 'duolingo'
+  | 'chesscom'
+  | 'yelp'
+  | 'opentable'
+  | 'polarsteps'
+  | 'meetup'
+  | 'bandsintown'
+  | 'steam';
+
+export interface Handle {
+  source: HandleSource;
+  /** The user-visible handle, e.g. "@bryn". */
+  value: string;
+  /** Whether this handle is shared with a given connection (asymmetrical, §5B). */
+  shared?: boolean;
+}
+
+/**
+ * Connection type (V1.5 feature, V1 data model). Filters icebreakers, contact
+ * sharing, and nudge language.
+ */
+export type ConnectionType =
+  | 'friend'
+  | 'professional'
+  | 'acquaintance'
+  | 'romantic';
+
+/** How a connection was first captured (Spec §5B). */
+export type ConnectionMethod = 'nfc' | 'sms' | 'search';
+
+/** A single shared point of common ground surfaced as an icebreaker (§3, §5B). */
+export interface Commonality {
+  id: string;
+  /** Short category label shown as an eyebrow, e.g. "MUSIC", "TRAVEL". */
+  category: string;
+  /** The shared thing, e.g. "Both into Phoebe Bridgers". */
+  title: string;
+  /** Optional supporting detail / conversation starter. */
+  detail?: string;
+  /** Optional source the commonality was derived from (V1.5 data pull). */
+  source?: HandleSource;
+}
+
+/** User profile (Spec §8). */
+export interface User {
+  id: string;
+  name: string;
+  /** Optional photo URI; when absent we render initials on a brand-color avatar. */
+  photo?: string;
+  /** Avatar background when no photo — a brand color, never gray (§5). */
+  avatarColor?: string;
+  interests: string[];
+  hobbies: string[];
+  bucketList: string[];
+  travel: string[];
+  lifeExperiences: string[];
+  handles: Handle[];
+  /** 0–100, drives the onboarding/home completion indicator (§5A). */
+  profileCompletion: number;
+}
+
+/** Nudge trigger type (Spec §5D, §8). */
+export type NudgeTrigger = 'time' | 'event';
+
+/** Logged response to a "did you reach out?" prompt (§5D). */
+export type NudgeResponse = 'reached_out' | 'not_yet' | null;
+
+export interface Nudge {
+  id: string;
+  connectionId: string;
+  trigger: NudgeTrigger;
+  /** Human-readable nudge copy, e.g. "Sarah just added she's into ceramics". */
+  message: string;
+  scheduledDate: string; // ISO date
+  response: NudgeResponse;
+  /** "due" nudges render with the orange due treatment (§ Pills). */
+  due: boolean;
+}
+
+/** A single confirmed-outreach entry in a connection's contact history (§5D). */
+export interface ContactLogEntry {
+  id: string;
+  date: string; // ISO date
+  /** Which platform the outreach happened on. */
+  via: HandleSource | 'imessage' | 'phone';
+  note?: string;
+}
+
+/** Per-connection nudge cadence (§5D Ongoing Management). */
+export type NudgeCadence = 'weekly' | 'monthly' | 'quarterly' | 'never';
+
+/** A confirmed connection (Spec §8). */
+export interface Connection {
+  id: string;
+  user: User;
+  method: ConnectionMethod;
+  connectionType: ConnectionType;
+  /** Where/when first met — free text for now (event/location context is V2). */
+  metContext?: string;
+  /** Contact info this user has chosen to share back (asymmetrical, §5B). */
+  sharedContactInfo: HandleSource[];
+  commonalities: Commonality[];
+  nudgeCadence: NudgeCadence;
+  /** ISO date of last confirmed outreach, or null if never. */
+  lastContacted: string | null;
+  /** ISO date of the next scheduled nudge. */
+  nextNudge: string | null;
+  contactHistory: ContactLogEntry[];
+}
+
+/** Pending connection tied to a phone number, 30-day expiry (Spec §5C, §8). */
+export interface PendingConnection {
+  id: string;
+  phone: string;
+  name?: string;
+  createdAt: string; // ISO date
+  expiresAt: string; // ISO date (createdAt + 30 days)
+  method: ConnectionMethod;
+}
