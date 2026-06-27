@@ -261,6 +261,76 @@ export function getConnection(id: string): Connection | undefined {
 /** The connection surfaced on the icebreaker / post-bump screen. */
 export const justBumped: Connection = connections[0];
 
+/**
+ * Discoverable people for the connect / bump flow. Since NFC isn't wired yet,
+ * the FAB "bumps" the next person from this pool that the user hasn't already
+ * connected with, then routes to the icebreaker.
+ */
+export const newCandidates: Connection[] = [
+  {
+    id: 'theo',
+    user: {
+      id: 'theo',
+      name: 'Theo Martins',
+      avatarColor: palette.navy,
+      interests: ['Cycling', 'Coffee', 'Film'],
+      hobbies: ['Cycling', 'Coffee', 'Film photography'],
+      bucketList: ['Ride a Grand Tour stage'],
+      travel: ['Lisbon', 'Mexico City'],
+      lifeExperiences: ['Bike-toured the Pyrenees'],
+      handles: [
+        { source: 'strava', value: 'Theo M' },
+        { source: 'instagram', value: '@theoshoots' },
+        { source: 'letterboxd', value: 'theom' },
+      ],
+      profileCompletion: 85,
+    },
+    method: 'nfc',
+    connectionType: 'friend',
+    metContext: 'Saturday group ride',
+    sharedContactInfo: ['strava', 'instagram'],
+    nudgeCadence: 'monthly',
+    lastContacted: null,
+    nextNudge: null,
+    commonalities: [
+      { id: 't1', category: 'Fitness', title: 'You both ride', detail: 'Theo logged a century on Strava last weekend.', source: 'strava' },
+      { id: 't2', category: 'Film', title: 'Both shoot film', source: 'letterboxd' },
+      { id: 't3', category: 'Travel', title: 'Both spent time in Lisbon' },
+    ],
+    contactHistory: [],
+  },
+  {
+    id: 'nadia',
+    user: {
+      id: 'nadia',
+      name: 'Nadia Rahman',
+      avatarColor: palette.orange,
+      interests: ['Reading', 'Pottery', 'Coffee'],
+      hobbies: ['Reading', 'Pottery', 'Coffee'],
+      bucketList: ['Write a novel'],
+      travel: ['Tokyo'],
+      lifeExperiences: ['Ran a bookshop pop-up'],
+      handles: [
+        { source: 'goodreads', value: 'nadiar' },
+        { source: 'instagram', value: '@nadiamakes' },
+      ],
+      profileCompletion: 70,
+    },
+    method: 'nfc',
+    connectionType: 'friend',
+    metContext: 'Book club',
+    sharedContactInfo: ['instagram', 'goodreads'],
+    nudgeCadence: 'monthly',
+    lastContacted: null,
+    nextNudge: null,
+    commonalities: [
+      { id: 'na1', category: 'Books', title: 'Both avid readers', detail: 'Nadia is currently reading the same book as you.', source: 'goodreads' },
+      { id: 'na2', category: 'Craft', title: 'You both do pottery' },
+    ],
+    contactHistory: [],
+  },
+];
+
 /** Active nudges for the home screen. */
 export const nudges: Nudge[] = [
   {

@@ -9,7 +9,7 @@
 import React, { useEffect } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -39,14 +39,21 @@ import {
   tiltFor,
   type,
 } from '../src/theme';
-import { currentUser, justBumped, handleMeta } from '../src/data/mock';
+import { justBumped, handleMeta } from '../src/data/mock';
+import { useStore } from '../src/store/useStore';
 import { useReducedMotion } from '../src/hooks/useReducedMotion';
 
 export default function IcebreakerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const reduced = useReducedMotion();
-  const connection = justBumped;
+  const { id } = useLocalSearchParams<{ id?: string }>();
+
+  const user = useStore((s) => s.user);
+  // Show the just-bumped person (added to the store before navigating here);
+  // fall back to the sample connection when opened without an id.
+  const connection =
+    useStore((s) => s.connections.find((c) => c.id === String(id))) ?? justBumped;
   const commonalities = connection.commonalities.slice(0, 3);
 
   // Bump collision — cards fly in from opposite sides and collide (§7).
@@ -100,7 +107,7 @@ export default function IcebreakerScreen() {
           }}
         >
           <Animated.View style={leftStyle}>
-            <Avatar name={currentUser.name} color={currentUser.avatarColor} size={76} rotate="-4deg" shadowed />
+            <Avatar name={user.name} color={user.avatarColor} size={76} rotate="-4deg" shadowed />
           </Animated.View>
           <Animated.View
             style={[

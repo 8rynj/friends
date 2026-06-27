@@ -16,6 +16,7 @@ import {
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
 import { colors } from '../src/theme';
+import { useStore } from '../src/store/useStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -25,12 +26,16 @@ export default function RootLayout() {
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
   });
+  // Wait for persisted state to rehydrate before rendering so screens never
+  // flash seed data over the user's saved profile/connections.
+  const hasHydrated = useStore((s) => s.hasHydrated);
+  const ready = loaded && hasHydrated;
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync().catch(() => {});
-  }, [loaded]);
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
-  if (!loaded) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

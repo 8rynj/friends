@@ -15,11 +15,13 @@ import {
   ProgressBar,
 } from '../../src/components';
 import { colors, palette, spacing, type } from '../../src/theme';
-import { currentUser, handleMeta } from '../../src/data/mock';
+import { handleMeta } from '../../src/data/mock';
+import { useStore } from '../../src/store/useStore';
 
 export default function YouScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const currentUser = useStore((s) => s.user);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>

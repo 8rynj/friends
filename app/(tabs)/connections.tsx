@@ -21,7 +21,7 @@ import {
   tiltFor,
   type,
 } from '../../src/theme';
-import { connections } from '../../src/data/mock';
+import { useStore } from '../../src/store/useStore';
 
 const TYPE_LABEL: Record<string, string> = {
   friend: 'Friend',
@@ -33,6 +33,7 @@ const TYPE_LABEL: Record<string, string> = {
 export default function ConnectionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const connections = useStore((s) => s.connections);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>

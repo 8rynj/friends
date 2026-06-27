@@ -24,6 +24,7 @@ import {
 import { border, colors, fonts, palette, spacing, type } from '../../src/theme';
 import { handleMeta, hobbyPool } from '../../src/data/mock';
 import { HandleSource } from '../../src/data/types';
+import { useStore } from '../../src/store/useStore';
 
 const MAX_HOBBIES = 5;
 const HANDLE_OPTIONS: HandleSource[] = [
@@ -41,10 +42,16 @@ const CHIP_COLORS = [palette.navy, palette.yellow, palette.orange];
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const user = useStore((s) => s.user);
+  const completeProfile = useStore((s) => s.completeProfile);
+
   const [step, setStep] = useState(0);
-  const [name, setName] = useState('');
-  const [hobbies, setHobbies] = useState<string[]>([]);
-  const [handles, setHandles] = useState<HandleSource[]>([]);
+  // Prefill from the existing profile so this doubles as profile editing.
+  const [name, setName] = useState(user.name ?? '');
+  const [hobbies, setHobbies] = useState<string[]>(user.hobbies ?? []);
+  const [handles, setHandles] = useState<HandleSource[]>(
+    (user.handles ?? []).map((h) => h.source),
+  );
 
   const totalSteps = 3;
   const percent = useMemo(() => {
@@ -67,7 +74,16 @@ export default function OnboardingScreen() {
   const toggleHandle = (s: HandleSource) =>
     setHandles((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
 
-  const finish = () => router.replace('/(tabs)');
+  const finish = () => {
+    // Persist the profile. Preserve existing handle values where we already
+    // have them; new sources are stored with an empty value for now.
+    const merged = handles.map(
+      (source) =>
+        user.handles.find((h) => h.source === source) ?? { source, value: '' },
+    );
+    completeProfile({ name: name.trim() || user.name, hobbies, handles: merged });
+    router.replace('/(tabs)');
+  };
   const next = () => (step < totalSteps - 1 ? setStep(step + 1) : finish());
 
   return (

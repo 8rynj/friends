@@ -8,9 +8,10 @@
  * and next-nudge per the follow-up flow.
  */
 import React from 'react';
-import { Linking, Platform, ScrollView, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Button,
@@ -27,9 +28,12 @@ import {
   tiltFor,
   type,
 } from '../../src/theme';
-import { getConnection, handleMeta } from '../../src/data/mock';
-import { HandleSource } from '../../src/data/types';
+import { handleMeta } from '../../src/data/mock';
+import { HandleSource, NudgeCadence } from '../../src/data/types';
+import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
+
+const CADENCES: NudgeCadence[] = ['weekly', 'monthly', 'quarterly', 'never'];
 
 /** Maps a shared handle to an outbound deep link (placeholders for V1). */
 function deepLink(source: HandleSource, handle: string): string {
@@ -57,7 +61,9 @@ export default function ConnectionProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
-  const connection = getConnection(String(id));
+  const connection = useStore((s) => s.connections.find((c) => c.id === String(id)));
+  const logOutreach = useStore((s) => s.logOutreach);
+  const setCadence = useStore((s) => s.setCadence);
 
   if (!connection) {
     return (
@@ -90,7 +96,9 @@ export default function ConnectionProfileScreen() {
         />
 
         <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.lg }}>
-          {/* Contact buttons — row of three (§8). */}
+          {/* Contact buttons — row of three (§8). Tapping logs confirmed
+              outreach (stamps last-contacted, reschedules the next nudge) then
+              deep-links into the platform (§5D). */}
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {contactSources.map((s) => (
               <View key={s} style={{ flex: 1 }}>
@@ -98,6 +106,7 @@ export default function ConnectionProfileScreen() {
                   label={handleMeta[s].label}
                   variant="secondary"
                   onPress={() => {
+                    logOutreach(connection.id, s);
                     const url = deepLink(s, handleFor(s));
                     if (Platform.OS !== 'web') Linking.openURL(url).catch(() => {});
                   }}
@@ -129,6 +138,37 @@ export default function ConnectionProfileScreen() {
               </View>
             </View>
           </CollageCard>
+
+          {/* Nudge cadence — per-connection follow-up frequency (§5D). */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={[type.label, { color: colors.textMutedOnLight }]}>Nudge me</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {CADENCES.map((cad) => {
+                const active = connection.nudgeCadence === cad;
+                return (
+                  <Pressable
+                    key={cad}
+                    onPress={() => {
+                      if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                      setCadence(connection.id, cad);
+                    }}
+                    style={{
+                      backgroundColor: active ? palette.navy : 'transparent',
+                      borderRadius: 100,
+                      borderWidth: 2,
+                      borderColor: colors.border,
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                    }}
+                  >
+                    <Text style={[type.micro, { color: active ? palette.cream : colors.nearBlack }]}>
+                      {cad}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Commonalities — alternating taped, tilted cards (§8). */}
           <View style={{ gap: spacing.md }}>
