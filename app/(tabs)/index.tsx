@@ -163,7 +163,7 @@ export default function HomeScreen() {
             </Text>
             <CollageCard
               background={palette.navy}
-              rotate="-1.5deg"
+              rotate="-0.8deg"
               taped
               tapeSide="right"
               onPress={() => router.push(`/connection/${nudgeConn.id}`)}

@@ -12,8 +12,8 @@ export const spacing = {
   xxl: 28,
   /** Horizontal screen padding (16–20px). */
   screen: 18,
-  /** Gap between cards in a stack (8–10px). */
-  cardGap: 9,
+  /** Gap between cards in a stack. */
+  cardGap: 13,
   /** Gap between major sections (12–16px). */
   section: 14,
 } as const;
@@ -54,7 +54,8 @@ export const shadow = {
  * functional cards. Decorative elements may go up to ±6°.
  */
 export const tilt = {
-  stack: ['1deg', '-1.2deg', '0.8deg', '-0.6deg', '1.4deg'],
+  // Subtle tilt — enough to feel handmade without cards visually colliding.
+  stack: ['0.5deg', '-0.5deg', '0.4deg', '-0.4deg', '0.6deg'],
   /** Max functional rotation. */
   maxFunctional: 2,
   /** Max decorative rotation (FAB, avatars, scraps). */

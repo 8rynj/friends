@@ -56,8 +56,11 @@ export function Marquee({ phrases, duration = motion.marquee }: MarqueeProps) {
         borderColor: colors.border,
       }}
     >
-      <Animated.View style={[{ flexDirection: 'row' }, animStyle]}>
+      {/* alignSelf flex-start + numberOfLines=1 keep it a single line that
+          overflows (and scrolls), instead of wrapping to the container width. */}
+      <Animated.View style={[{ flexDirection: 'row', alignSelf: 'flex-start' }, animStyle]}>
         <Text
+          numberOfLines={1}
           onLayout={(e) => setContentWidth(e.nativeEvent.layout.width)}
           style={{
             fontFamily: fonts.bold,
@@ -70,6 +73,7 @@ export function Marquee({ phrases, duration = motion.marquee }: MarqueeProps) {
         </Text>
         {/* Duplicate for a seamless loop. */}
         <Text
+          numberOfLines={1}
           style={{
             fontFamily: fonts.bold,
             fontSize: 11,
