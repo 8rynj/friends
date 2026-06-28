@@ -3,7 +3,7 @@
  * until fonts are ready, and registers the navigation stack. Onboarding and the
  * icebreaker present modally; tabs and the connection profile push normally.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +21,7 @@ import { useStore } from '../src/store/useStore';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [loaded, fontError] = useFonts({
     SpaceGrotesk_400Regular,
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
@@ -29,7 +29,28 @@ export default function RootLayout() {
   // Wait for persisted state to rehydrate before rendering so screens never
   // flash seed data over the user's saved profile/connections.
   const hasHydrated = useStore((s) => s.hasHydrated);
-  const ready = loaded && hasHydrated;
+
+  // Fail-safe: never block startup forever. Render once fonts resolve (loaded
+  // OR errored) and the store hydrates — and force-render after 4s regardless,
+  // so a font/hydration hiccup can't leave a blank splash.
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const fontsResolved = loaded || !!fontError;
+  const ready = (fontsResolved && hasHydrated) || timedOut;
+
+  // Diagnostic — shows in the Metro terminal which gate (if any) is stalling.
+  useEffect(() => {
+    console.log('[Knowable] startup gate', {
+      fontsLoaded: loaded,
+      fontError: fontError ? String(fontError) : null,
+      hasHydrated,
+      timedOut,
+    });
+  }, [loaded, fontError, hasHydrated, timedOut]);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
