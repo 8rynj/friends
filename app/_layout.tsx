@@ -72,6 +72,7 @@ export default function RootLayout() {
           <Stack.Screen name="add" options={{ presentation: 'modal' }} />
           <Stack.Screen name="find" />
           <Stack.Screen name="invite" />
+          <Stack.Screen name="settings" />
           <Stack.Screen name="icebreaker" options={{ presentation: 'modal' }} />
           <Stack.Screen
             name="onboarding/index"

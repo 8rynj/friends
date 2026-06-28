@@ -84,6 +84,31 @@ export type FacetKey =
   | 'travel'
   | 'lifeExperiences';
 
+/** User settings & privacy preferences (Spec §Privacy, §Notifications). */
+export interface Settings {
+  /** NFC bump enabled — on by default (§Privacy). */
+  nfcEnabled: boolean;
+  /** Discoverable in search — on by default; opt-out hides you (§Privacy). */
+  searchable: boolean;
+  /** Push notifications for nudges. */
+  pushNudges: boolean;
+  /** Push notifications when a connection adds a new commonality (V1.5). */
+  pushUpdates: boolean;
+  /** Email fallback for notifications. */
+  emailFallback: boolean;
+  /** Default nudge cadence applied to new connections (§5D). */
+  defaultCadence: NudgeCadence;
+}
+
+const DEFAULT_SETTINGS: Settings = {
+  nfcEnabled: true,
+  searchable: true,
+  pushNudges: true,
+  pushUpdates: true,
+  emailFallback: false,
+  defaultCadence: 'monthly',
+};
+
 interface AppState {
   hasHydrated: boolean;
   onboarded: boolean;
@@ -96,6 +121,8 @@ interface AppState {
   incomingRequests: IncomingRequest[];
   /** Pending SMS invites tied to a phone number, 30-day expiry (§5C). */
   pendingConnections: PendingConnection[];
+  /** User settings & privacy preferences. */
+  settings: Settings;
 
   setHasHydrated: (v: boolean) => void;
   /** Merge a profile patch and recompute completion (onboarding / editing). */
@@ -129,6 +156,12 @@ interface AppState {
   claimPending: (pendingId: string) => string | undefined;
   /** Cancel a pending invite. */
   cancelPending: (pendingId: string) => void;
+
+  // --- Settings ---
+  /** Merge a settings patch (privacy / notifications / defaults). */
+  updateSettings: (patch: Partial<Settings>) => void;
+  /** Reset all app data back to the seed state (mock sign-out). */
+  resetApp: () => void;
 }
 
 export const useStore = create<AppState>()(
@@ -143,6 +176,7 @@ export const useStore = create<AppState>()(
       outgoingRequests: [],
       incomingRequests: incomingRequestsSeed,
       pendingConnections: [],
+      settings: DEFAULT_SETTINGS,
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
 
@@ -267,6 +301,7 @@ export const useStore = create<AppState>()(
         const connection: Connection = {
           ...person,
           metContext: note ? `Connected via search · “${note}”` : 'Connected via search',
+          nudgeCadence: s.settings.defaultCadence,
         };
         set((st) => ({
           connections: [connection, ...st.connections],
@@ -339,10 +374,25 @@ export const useStore = create<AppState>()(
 
       cancelPending: (pendingId) =>
         set((s) => ({ pendingConnections: s.pendingConnections.filter((p) => p.id !== pendingId) })),
+
+      updateSettings: (patch) =>
+        set((s) => ({ settings: { ...s.settings, ...patch } })),
+
+      resetApp: () =>
+        set({
+          user: currentUser,
+          connections: mockConnections,
+          nudges: [...mockNudges, ...generateEventNudges(currentUser, mockConnections)],
+          outgoingRequests: [],
+          incomingRequests: incomingRequestsSeed,
+          pendingConnections: [],
+          settings: DEFAULT_SETTINGS,
+          onboarded: true,
+        }),
     }),
     {
-      // Bumped to v4 for connect-flow state (requests + pending invites).
-      name: 'knowable-store-v4',
+      // Bumped to v5 for settings.
+      name: 'knowable-store-v5',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,
@@ -352,6 +402,7 @@ export const useStore = create<AppState>()(
         outgoingRequests: s.outgoingRequests,
         incomingRequests: s.incomingRequests,
         pendingConnections: s.pendingConnections,
+        settings: s.settings,
       }),
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },

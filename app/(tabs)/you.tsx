@@ -45,6 +45,21 @@ export default function YouScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Settings entry — top-right gear. */}
+        <View style={{ alignItems: 'flex-end' }}>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            hitSlop={10}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: colors.cream, borderWidth: 2, borderColor: colors.border,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 18, color: colors.nearBlack }}>⚙</Text>
+          </Pressable>
+        </View>
+
         <View style={{ alignItems: 'center', gap: 10 }}>
           <Avatar
             name={user.name}

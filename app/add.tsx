@@ -17,7 +17,10 @@ export default function AddScreen() {
   const router = useRouter();
   const connections = useStore((s) => s.connections);
   const addConnection = useStore((s) => s.addConnection);
+  const setCadence = useStore((s) => s.setCadence);
   const pending = useStore((s) => s.pendingConnections);
+  const nfcEnabled = useStore((s) => s.settings.nfcEnabled);
+  const defaultCadence = useStore((s) => s.settings.defaultCadence);
 
   // NFC bump stand-in: connect the next discoverable candidate.
   const bump = () => {
@@ -25,6 +28,7 @@ export default function AddScreen() {
     const candidate = newCandidates.find((c) => !connections.some((x) => x.id === c.id));
     if (candidate) {
       addConnection(candidate);
+      setCadence(candidate.id, defaultCadence);
       router.replace(`/icebreaker?id=${candidate.id}`);
     } else {
       router.replace('/icebreaker');
@@ -32,7 +36,14 @@ export default function AddScreen() {
   };
 
   const methods = [
-    { key: 'bump', title: 'Bump to connect', blurb: 'Tap phones with someone nearby (NFC).', bg: palette.navy, onPress: bump },
+    {
+      key: 'bump',
+      title: nfcEnabled ? 'Bump to connect' : 'Bump to connect (NFC off)',
+      blurb: nfcEnabled ? 'Tap phones with someone nearby (NFC).' : 'Turn NFC on in Settings to bump.',
+      bg: palette.navy,
+      disabled: !nfcEnabled,
+      onPress: nfcEnabled ? bump : () => router.push('/settings'),
+    },
     { key: 'find', title: 'Find someone', blurb: 'Search by name and send a request.', bg: palette.cream, onPress: () => router.push('/find') },
     { key: 'invite', title: 'Invite by text', blurb: 'Not on Knowable yet? Send them a link.', bg: palette.yellow, onPress: () => router.push('/invite') },
   ];
@@ -82,7 +93,7 @@ export default function AddScreen() {
             background={m.bg}
             rotate={i % 2 === 0 ? '-1deg' : '1deg'}
             onPress={m.onPress}
-            style={{ paddingVertical: 18 }}
+            style={{ paddingVertical: 18, opacity: 'disabled' in m && m.disabled ? 0.55 : 1 }}
           >
             <Text style={[type.cardTitle, { color: m.bg === palette.navy ? palette.offWhite : colors.nearBlack, fontSize: 17 }]}>
               {m.title}

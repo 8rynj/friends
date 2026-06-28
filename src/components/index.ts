@@ -17,3 +17,4 @@ export * from './Fab';
 export * from './CatalogPicker';
 export * from './FreeTextListEditor';
 export * from './ProfileQuests';
+export * from './Toggle';
