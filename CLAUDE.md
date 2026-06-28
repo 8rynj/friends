@@ -102,5 +102,11 @@ src/
 ## Not built yet
 
 SMS magic-link auth, real NFC bump, backend/persistence, live data-pull
-integrations (currently simulated in `src/data/datapull.ts`), local/push
+integrations (currently simulated in `src/data/datapull.ts`), remote push
 notifications, unit tests. Types are shaped to accommodate these.
+
+Local nudge reminders ARE wired (`src/engine/notifications.ts` +
+`src/hooks/useNudgeReminders.ts`): expo-notifications schedules an on-device
+reminder per connection's `nextNudge`, gated by the "Nudge reminders" setting
+and OS permission. Native-only (no-op on web), so it doesn't affect the web
+bundle/CI.

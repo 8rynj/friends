@@ -22,6 +22,7 @@ import {
 } from '@expo-google-fonts/space-grotesk';
 import { colors } from '../src/theme';
 import { useStore } from '../src/store/useStore';
+import { useNudgeReminders } from '../src/hooks/useNudgeReminders';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -32,6 +33,9 @@ export default function RootLayout() {
     SpaceGrotesk_700Bold,
   });
   const hasHydrated = useStore((s) => s.hasHydrated);
+
+  // Keep local nudge reminders in sync with store state (native-only).
+  useNudgeReminders();
 
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
