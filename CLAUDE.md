@@ -26,11 +26,14 @@ Fast verification loop used in this project (no device needed):
 
 ```bash
 npx tsc --noEmit                                   # typecheck
+npm test                                           # Jest unit tests (engine + store)
 EXPO_OFFLINE=1 CI=1 npx expo export --platform web # bundles every route via Metro — catches import/runtime errors
 ```
 
-CI (`.github/workflows/ci.yml`) runs exactly those two on every PR. There is no
-test runner yet.
+CI (`.github/workflows/ci.yml`) runs exactly those three on every PR. Tests use
+**jest-expo** and live in `src/**/__tests__/*.test.ts`; they cover the pure logic
+layers (commonality engine, nudges, Zustand store) — not RN screens. AsyncStorage
+is mocked in `jest.setup.js` so the persisted store imports under Node.
 
 **Cost note:** prefer typecheck + web bundle + text assertions for verification;
 screenshots are token-expensive — only use them for genuinely visual changes.
@@ -103,4 +106,4 @@ src/
 
 SMS magic-link auth, real NFC bump, backend/persistence, live data-pull
 integrations (currently simulated in `src/data/datapull.ts`), local/push
-notifications, unit tests. Types are shaped to accommodate these.
+notifications. Types are shaped to accommodate these.
