@@ -1,24 +1,19 @@
 /**
- * TEMPORARY DEBUG layout — isolates "splash stuck on top" vs a navigator/screen
- * problem. If the simulator shows a yellow screen with "KNOWABLE TEST OK", then
- * rendering + splash-hide work and the issue is in the Stack/screens. If it's
- * still dark, the native splash isn't hiding (or the RN root isn't displaying).
- * Will be reverted once we know which it is.
+ * TEMPORARY DEBUG layout v2 — no splash-screen control at all (lets the native
+ * splash auto-hide), plus load markers so we can confirm the new bundle is live.
+ * If you see a magenta screen with "KNOWABLE v2", rendering works and the splash
+ * was the problem. Will be reverted.
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Text, View } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
+console.log('[Knowable] DEBUG v2 module loaded');
 
 export default function RootLayout() {
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-
+  console.log('[Knowable] DEBUG v2 render');
   return (
-    <View style={{ flex: 1, backgroundColor: '#E8C547', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 28, fontWeight: '700', color: '#1a1a1a' }}>KNOWABLE TEST OK</Text>
+    <View style={{ flex: 1, backgroundColor: '#D85A30', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 28, fontWeight: '700', color: '#F0EBE0' }}>KNOWABLE v2</Text>
     </View>
   );
 }
