@@ -125,6 +125,7 @@ export default function OnboardingScreen() {
                 onChangeText={setName}
                 placeholder="Your name"
                 placeholderTextColor={colors.textMutedOnDark}
+                accessibilityLabel="Your name"
                 style={{
                   fontFamily: fonts.bold,
                   fontSize: 18,
@@ -224,6 +225,10 @@ export default function OnboardingScreen() {
                       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                       toggleHandle(s);
                     }}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={handleMeta[s].label}
+                    accessibilityState={{ selected: handles.includes(s) }}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -260,7 +265,13 @@ export default function OnboardingScreen() {
             fullWidth
             onPress={next}
           />
-          <Pressable onPress={next} style={{ alignSelf: 'center', paddingVertical: 8 }}>
+          <Pressable
+            onPress={next}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={step < TOTAL_STEPS - 1 ? 'Skip for now' : 'Finish later'}
+            style={{ alignSelf: 'center', paddingVertical: 8 }}
+          >
             <Text style={[type.label, { color: colors.textMutedOnDark }]}>
               {step < TOTAL_STEPS - 1 ? 'Skip for now' : 'Finish later'}
             </Text>

@@ -6,11 +6,11 @@
  * platforms show their pulled highlights. Real OAuth + APIs drop in behind
  * connectDataPull/simulatePull without changing this screen.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Button, CollageCard, OutlineText, Pill } from '../src/components';
+import { Button, CollageCard, OutlineText, Pill, SkeletonBlock } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { DATA_PULL_SOURCES, dataPullBlurb } from '../src/data/datapull';
 import { handleMeta } from '../src/data/mock';
@@ -49,9 +49,20 @@ export default function ConnectScreen() {
   const pulled = usePulled();
   const handles = useStore((s) => s.user.handles);
   const connectDataPull = useStore((s) => s.connectDataPull);
+  const [pulling, setPulling] = useState<DataPullSource | null>(null);
 
   const isConnected = (s: DataPullSource) =>
     handles.some((h) => h.source === s && h.dataPulled);
+
+  // The real pull is an API call in production (per file header); simulate the
+  // in-flight state here so the loading placeholder has somewhere to live.
+  const pull = (s: DataPullSource) => {
+    setPulling(s);
+    setTimeout(() => {
+      connectDataPull(s);
+      setPulling(null);
+    }, 700);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>
@@ -67,13 +78,15 @@ export default function ConnectScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Connect your</Text>
@@ -116,8 +129,22 @@ export default function ConnectScreen() {
                 </View>
                 {connected ? (
                   <Pill label="Pulled ★" variant="connected" />
+                ) : pulling === s ? (
+                  <View
+                    style={{ width: 100 }}
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Connecting ${handleMeta[s].label}`}
+                  >
+                    <SkeletonBlock height={44} radius={100} />
+                  </View>
                 ) : (
-                  <Button label="Connect" variant="primary" onPress={() => connectDataPull(s)} />
+                  <Button
+                    label="Connect"
+                    variant="primary"
+                    onPress={() => pull(s)}
+                    accessibilityLabel={`Connect ${handleMeta[s].label}`}
+                  />
                 )}
               </View>
             </CollageCard>

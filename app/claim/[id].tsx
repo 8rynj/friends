@@ -18,6 +18,7 @@ import {
   Avatar,
   Button,
   CollageCard,
+  ErrorState,
   Hero,
   Pill,
 } from '../../src/components';
@@ -85,8 +86,13 @@ export default function ClaimScreen() {
   const inviter = findInviter(String(id));
   if (!inviter) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[type.headline, { color: colors.nearBlack }]}>Invite not found</Text>
+      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: spacing.screen }}>
+        <ErrorState
+          title="Invite not found"
+          body="This link may have expired or already been claimed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }

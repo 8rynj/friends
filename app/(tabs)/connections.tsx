@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import {
   Avatar,
   CollageCard,
+  EmptyState,
   OutlineText,
   Pill,
 } from '../../src/components';
@@ -61,6 +62,15 @@ export default function ConnectionsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {connections.length === 0 && (
+          <EmptyState
+            icon="👋"
+            title="No connections yet"
+            body="Bump, search, or invite someone to start building your people."
+            actionLabel="Add a connection"
+            onAction={() => router.push('/add')}
+          />
+        )}
         {connections.map((c, i) => {
           const bg = cardBackgrounds[i % cardBackgrounds.length];
           const fg = textOn(bg);
@@ -74,6 +84,7 @@ export default function ConnectionsScreen() {
               background={bg}
               rotate={tiltFor(i)}
               onPress={() => router.push(`/connection/${c.id}`)}
+              accessibilityLabel={`View ${c.user.name}'s profile`}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <Avatar name={c.user.name} color={c.user.avatarColor} size={46} />

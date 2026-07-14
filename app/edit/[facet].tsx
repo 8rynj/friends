@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   CatalogPicker,
+  ErrorState,
   FreeTextListEditor,
   HobbyChip,
   OutlineText,
@@ -100,8 +101,13 @@ export default function FacetEditor() {
 
   if (!config) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[type.headline, { color: colors.nearBlack }]}>Unknown section</Text>
+      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: spacing.screen }}>
+        <ErrorState
+          title="Unknown section"
+          body="This profile section doesn’t exist."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }
@@ -128,14 +134,16 @@ export default function FacetEditor() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream,
             borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>{config.title}</Text>

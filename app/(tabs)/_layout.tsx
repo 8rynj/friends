@@ -61,9 +61,15 @@ function TabBar({ state, navigation }: TabBarProps) {
           <Pressable
             key={route.key}
             onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityLabel={LABELS[route.name] ?? route.name}
+            accessibilityState={{ selected: focused }}
             style={{ flex: 1, alignItems: 'center', gap: 3 }}
           >
-            <Text style={{ fontSize: 20, color: focused ? colors.navy : '#bbb' }}>
+            <Text
+              allowFontScaling={false}
+              style={{ fontSize: 20, color: focused ? colors.navy : '#bbb' }}
+            >
               {ICONS[route.name] ?? '•'}
             </Text>
             <Text

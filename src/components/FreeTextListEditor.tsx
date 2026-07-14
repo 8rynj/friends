@@ -47,6 +47,7 @@ export function FreeTextListEditor({
           returnKeyType="done"
           placeholder={placeholder}
           placeholderTextColor={onDark ? colors.textMutedOnDark : colors.textMutedOnLight}
+          accessibilityLabel={placeholder}
           style={{
             flex: 1,
             fontFamily: fonts.medium,
@@ -62,6 +63,9 @@ export function FreeTextListEditor({
         />
         <Pressable
           onPress={add}
+          hitSlop={{ top: 4, bottom: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Add"
           style={{
             justifyContent: 'center',
             paddingHorizontal: 18,
@@ -80,6 +84,9 @@ export function FreeTextListEditor({
           <Pressable
             key={item}
             onPress={() => remove(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${item}`}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
