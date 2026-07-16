@@ -152,8 +152,8 @@ interface AppState {
   ignoreIncoming: (requestId: string) => void;
   /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
   createPendingInvite: (name: string, phone: string) => string;
-  /** Claim a pending invite → confirmed connection. Returns the connection id. */
-  claimPending: (pendingId: string) => string | undefined;
+  /** Claim a pending invite → confirmed connection, tagged with the claimant's verified phone. Returns the connection id. */
+  claimPending: (pendingId: string, claimantPhone?: string) => string | undefined;
   /** Cancel a pending invite. */
   cancelPending: (pendingId: string) => void;
 
@@ -336,7 +336,7 @@ export const useStore = create<AppState>()(
         return id;
       },
 
-      claimPending: (pendingId) => {
+      claimPending: (pendingId, claimantPhone) => {
         const pending = get().pendingConnections.find((p) => p.id === pendingId);
         if (!pending) return undefined;
         const id = `claimed-${pendingId}`;
@@ -345,6 +345,7 @@ export const useStore = create<AppState>()(
           user: {
             id,
             name: pending.name ?? pending.phone,
+            phone: claimantPhone ?? pending.phone,
             avatarColor: '#1A3A6B',
             interests: [],
             hobbies: [],
@@ -391,8 +392,8 @@ export const useStore = create<AppState>()(
         }),
     }),
     {
-      // Bumped to v5 for settings.
-      name: 'knowable-store-v5',
+      // Bumped to v6 for User.phone (passwordless phone auth).
+      name: 'knowable-store-v6',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,

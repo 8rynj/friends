@@ -13,7 +13,9 @@ import { useRouter } from 'expo-router';
 import { Button, CollageCard, OutlineText, Toggle } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { NudgeCadence } from '../src/data/types';
+import { signOutPhone } from '../src/lib/auth';
 import { Settings, useStore } from '../src/store/useStore';
+import { useAuthStore } from '../src/store/useAuthStore';
 
 const CADENCES: NudgeCadence[] = ['weekly', 'monthly', 'quarterly', 'never'];
 
@@ -24,18 +26,25 @@ export default function SettingsScreen() {
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
   const resetApp = useStore((s) => s.resetApp);
+  const authPhone = useAuthStore((s) => s.phone);
 
   const set = (patch: Partial<Settings>) => updateSettings(patch);
 
+  const signOut = async () => {
+    resetApp();
+    await signOutPhone().catch(() => {});
+    // The root layout's auth-state subscription redirects to /auth/phone
+    // once the session clears.
+  };
+
   const confirmReset = () => {
     if (Platform.OS === 'web') {
-      resetApp();
-      router.replace('/');
+      signOut();
       return;
     }
-    Alert.alert('Reset app data?', 'This clears your connections and settings back to the demo state.', [
+    Alert.alert('Sign out?', 'This clears your connections and settings back to the demo state.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => { resetApp(); router.replace('/'); } },
+      { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
   };
 
@@ -144,7 +153,12 @@ export default function SettingsScreen() {
         {/* Account */}
         <Section title="Account">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={[type.cardTitle, { color: colors.nearBlack }]}>{user.name}</Text>
+            <View>
+              <Text style={[type.cardTitle, { color: colors.nearBlack }]}>{user.name}</Text>
+              {authPhone && (
+                <Text style={[type.body, { color: colors.textMutedOnLight }]}>{authPhone}</Text>
+              )}
+            </View>
             <Pressable onPress={() => router.push('/onboarding')}>
               <Text style={[type.label, { color: colors.navy }]}>Edit profile</Text>
             </Pressable>

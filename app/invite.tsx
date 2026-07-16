@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CollageCard, OutlineText, Pill } from '../src/components';
 import { border, colors, fonts, palette, radii, spacing, type } from '../src/theme';
+import { isValidPhone, normalizePhone } from '../src/lib/phone';
 import { useStore } from '../src/store/useStore';
 
 function daysLeft(expiresAt: string): number {
@@ -30,10 +31,13 @@ export default function InviteScreen() {
   const createPendingInvite = useStore((s) => s.createPendingInvite);
   const cancelPending = useStore((s) => s.cancelPending);
 
+  const normalizedPhone = normalizePhone(phone);
+  const phoneValid = isValidPhone(normalizedPhone);
+
   const send = () => {
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !phoneValid) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    createPendingInvite(name.trim(), phone.trim());
+    createPendingInvite(name.trim(), normalizedPhone);
     setName('');
     setPhone('');
   };
@@ -81,7 +85,12 @@ export default function InviteScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
-        <TextInput value={phone} onChangeText={setPhone} placeholder="Their number" keyboardType="phone-pad" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
+        <TextInput value={phone} onChangeText={setPhone} placeholder="Their number, e.g. +1 555 123 4567" keyboardType="phone-pad" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
+        {phone.trim().length > 0 && !phoneValid && (
+          <Text style={[type.label, { color: colors.orange, marginTop: -spacing.sm }]}>
+            Include the country code, e.g. +1 555 123 4567
+          </Text>
+        )}
 
         {/* Pre-filled message preview (would open iMessage/SMS on device). */}
         <View style={{ backgroundColor: palette.offWhite, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>
@@ -91,9 +100,9 @@ export default function InviteScreen() {
 
         <Pressable
           onPress={send}
-          disabled={!name.trim() || !phone.trim()}
+          disabled={!name.trim() || !phoneValid}
           style={{
-            opacity: !name.trim() || !phone.trim() ? 0.5 : 1,
+            opacity: !name.trim() || !phoneValid ? 0.5 : 1,
             backgroundColor: colors.nearBlack, borderRadius: radii.pill,
             borderWidth: 2, borderColor: colors.border, paddingVertical: 14, alignItems: 'center',
           }}
