@@ -3,7 +3,9 @@
 Knowable helps people turn good conversations into real friendships: capture a
 connection when you meet (NFC bump / search / SMS invite), surface what you have
 in common as icebreakers, and nudge timely follow-up. This repo is the React
-Native (Expo) app. It currently runs on **mock data** (no backend/auth yet).
+Native (Expo) app. It runs on **mock data by default** (no auth yet); a
+Supabase-backed data layer can be enabled behind the same store API — see
+[Supabase (optional backend)](#supabase-optional-backend).
 
 ## Stack
 
@@ -51,9 +53,13 @@ app/                      Expo Router routes
 src/
   theme/                  colors, typography, layout/motion tokens (reference roles, not hex)
   components/             collage design-system primitives + UI (barrel: index.ts)
-  data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts
+  data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts,
+                          repository.ts (Supabase repository behind the store)
+  lib/                    supabase.ts (client + isSupabaseConfigured)
   engine/                 commonality.ts (the matching engine), nudges.ts
   hooks/                  useReducedMotion
+supabase/
+  schema.sql              users, connections, nudges, pending_connections, requests tables + RLS
 ```
 
 ## Architecture notes
@@ -76,6 +82,42 @@ src/
   (±0.4–0.6°), tape/scraps/halftone, Space Grotesk, outline text via SVG. Never
   pure white (cream/off-white), yellow is accent-only, flat color blocks (no
   gradients). Keep decoration off readable text and off navigation.
+
+## Supabase (optional backend)
+
+The Zustand store (`src/store/useStore.ts`) can be backed by Supabase without
+any screen or action changing. This is entirely additive and opt-in via env
+vars — with none set, the app behaves exactly as before (mock seed +
+AsyncStorage only, zero network calls).
+
+**Setup:**
+
+1. Create a project at supabase.com (or use an existing one).
+2. In the SQL editor, run `supabase/schema.sql` — creates `users`,
+   `connections`, `nudges`, `pending_connections`, `requests`, with RLS enabled
+   and permissive dev policies (see the file's RLS comment — there's no
+   Supabase Auth yet, so policies aren't owner-scoped; tighten before shipping
+   with real users).
+3. Copy `.env.example` to `.env.local` and fill in `EXPO_PUBLIC_SUPABASE_URL` /
+   `EXPO_PUBLIC_SUPABASE_ANON_KEY` from the project's Settings → API page.
+4. Restart Metro (`npx expo start -c` to clear the env cache).
+
+**How it works:**
+
+- `src/lib/supabase.ts` builds the client from the env vars; `isSupabaseConfigured`
+  is false (client is `null`) when either is missing.
+- `src/data/repository.ts` maps between the store's TypeScript shapes and the
+  Supabase row shapes (a connection's embedded `user` profile is stored as a
+  `profile` jsonb column, not normalized — there's no auth/real accounts yet,
+  so connections aren't necessarily linked to another `users` row).
+- `useStore.ts` calls the repository in exactly two places, both additive:
+  once at module load to hydrate remote state over the local/mock state (and
+  to seed a fresh project from the mock data if it's empty), and once via
+  `useStore.subscribe` to push each changed slice (user, connections, nudges,
+  pending connections, requests) to Supabase in the background after every
+  action. No store action was rewritten — this is why screens are unaffected.
+- Sync is single-user / single-tenant (owner id is always the seeded `me`
+  user's id) since there's no auth to key by yet — see "Not built yet" below.
 
 ## Gotchas (learned the hard way)
 
@@ -101,6 +143,8 @@ src/
 
 ## Not built yet
 
-SMS magic-link auth, real NFC bump, backend/persistence, live data-pull
-integrations (currently simulated in `src/data/datapull.ts`), local/push
-notifications, unit tests. Types are shaped to accommodate these.
+SMS magic-link auth, real NFC bump, live data-pull integrations (currently
+simulated in `src/data/datapull.ts`), local/push notifications, unit tests.
+Types are shaped to accommodate these. A Supabase-backed data layer exists
+(see above) but is single-tenant / keyed to a fixed dev user until real auth
+lands — multi-user support needs Supabase Auth + owner-scoped RLS policies.
