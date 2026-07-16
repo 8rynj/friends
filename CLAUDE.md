@@ -12,6 +12,8 @@ Native (Expo) app. It currently runs on **mock data** (no backend/auth yet).
 - **Zustand** + **AsyncStorage** for state/persistence (`src/store/useStore.ts`)
 - **react-native-svg** (outline text, halftone, icons), **react-native-reanimated**
   (animations; needs `react-native-worklets`), **expo-haptics**, **expo-font**
+- **expo-notifications** + **expo-device** for push registration/deep links
+  (`src/notifications/`); the backend send function lives in `server/`
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
@@ -53,7 +55,10 @@ src/
   components/             collage design-system primitives + UI (barrel: index.ts)
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts
   engine/                 commonality.ts (the matching engine), nudges.ts
+  notifications/          push token registration, copy builders, tap-to-open deep links
   hooks/                  useReducedMotion
+server/
+  sendPush.ts             Backend push-send function (Expo Push API) — not yet wired to a live backend
 ```
 
 ## Architecture notes
@@ -67,7 +72,14 @@ src/
   connection type (friend/professional/acquaintance/romantic).
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist
-  `name` version when the persisted shape changes (currently `knowable-store-v5`).
+  `name` version when the persisted shape changes (currently `knowable-store-v6`).
+- **Push notifications (`src/notifications/`, `server/sendPush.ts`)** — the
+  client registers/clears an Expo push token as the Settings `pushNudges` /
+  `pushUpdates` toggles change (`app/_layout.tsx`), and routes a tapped
+  notification's `data.connectionId` to that connection's profile. The backend
+  send function (nudge/connection/new-commonality, Expo Push API) is real and
+  deployable but has no live caller yet — it's the shape the backend (once
+  built) calls after checking a recipient's stored settings.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -92,6 +104,10 @@ src/
 - **Yoga ≠ web layout:** the marquee single-line fix measures width off-screen
   and renders fixed-width copies because `alignSelf`/`numberOfLines` shrink-wrap
   differently than on web. Watch for similar web-vs-native layout gaps.
+- **Push tokens need an EAS project id.** `getExpoPushTokenAsync` wants
+  `extra.eas.projectId` in `app.json`; there isn't one yet (no EAS project
+  configured), so `registerForPushTokenAsync` fails closed (returns `null`)
+  rather than throwing. Real device tokens will start flowing once EAS is set up.
 
 ## Git / workflow
 
@@ -102,5 +118,7 @@ src/
 ## Not built yet
 
 SMS magic-link auth, real NFC bump, backend/persistence, live data-pull
-integrations (currently simulated in `src/data/datapull.ts`), local/push
-notifications, unit tests. Types are shaped to accommodate these.
+integrations (currently simulated in `src/data/datapull.ts`), unit tests.
+Push notifications are scaffolded (`src/notifications/`, `server/sendPush.ts`)
+but not wired to a live backend — no EAS project id, no server calling
+`sendPush.ts` yet. Types are shaped to accommodate these.
