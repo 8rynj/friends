@@ -170,6 +170,12 @@ export interface Connection {
   /** ISO date of the next scheduled nudge. */
   nextNudge: string | null;
   contactHistory: ContactLogEntry[];
+  /**
+   * "Not interested" — user archived this connection (V2). Hidden from Home
+   * and the default People list, excluded from nudges/due counts, but kept
+   * (not deleted) and reversible from the Archived view.
+   */
+  archived?: boolean;
 }
 
 /** Pending connection tied to a phone number, 30-day expiry (Spec §5C, §8). */

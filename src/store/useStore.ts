@@ -140,6 +140,10 @@ interface AppState {
   setCadence: (connectionId: string, cadence: NudgeCadence) => void;
   /** Set a connection's type (filters icebreakers, sharing, nudge copy — V1.5). */
   setConnectionType: (connectionId: string, type: ConnectionType) => void;
+  /** Mark "not interested": hides from Home/People and pauses nudges (V2). Reversible. */
+  archiveConnection: (connectionId: string) => void;
+  /** Undo an archive — restores default cadence and resumes nudges (V2). */
+  unarchiveConnection: (connectionId: string) => void;
   /** V1.5: connect a platform and pull (simulated) its signals onto the profile. */
   connectDataPull: (source: DataPullSource) => void;
 
@@ -261,6 +265,35 @@ export const useStore = create<AppState>()(
         set((s) => ({
           connections: s.connections.map((c) =>
             c.id === connectionId ? { ...c, connectionType: type } : c,
+          ),
+        })),
+
+      archiveConnection: (connectionId) =>
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId
+              ? { ...c, archived: true, nudgeCadence: 'never' as const, nextNudge: null }
+              : c,
+          ),
+          // Drop any open nudge for this connection so it can't resurface on Home.
+          nudges: s.nudges.map((n) =>
+            n.connectionId === connectionId && n.response === null
+              ? { ...n, response: 'not_yet' as const, due: false }
+              : n,
+          ),
+        })),
+
+      unarchiveConnection: (connectionId) =>
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId
+              ? {
+                  ...c,
+                  archived: false,
+                  nudgeCadence: s.settings.defaultCadence,
+                  nextNudge: nextNudgeDate(c.lastContacted ?? todayISO(), s.settings.defaultCadence),
+                }
+              : c,
           ),
         })),
 
