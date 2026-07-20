@@ -32,7 +32,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Knowable uses NFC to connect with people you tap phones with."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
