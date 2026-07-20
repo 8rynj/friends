@@ -17,6 +17,7 @@ import {
   DataPullSource,
   HandleSource,
   IncomingRequest,
+  MetContext,
   NudgeCadence,
   NudgeResponse,
   OutgoingRequest,
@@ -145,13 +146,13 @@ interface AppState {
 
   // --- Connect flows (Spec §5B/§5C) ---
   /** Send a connect request to a directory person; resolves by disposition. */
-  sendConnectRequest: (personId: string, note?: string) => RequestOutcome;
+  sendConnectRequest: (personId: string, note?: string, met?: MetContext) => RequestOutcome;
   /** Accept an incoming request → becomes a connection. Returns its id. */
   acceptIncoming: (requestId: string) => string | undefined;
   /** Ignore an incoming request. */
   ignoreIncoming: (requestId: string) => void;
   /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
-  createPendingInvite: (name: string, phone: string) => string;
+  createPendingInvite: (name: string, phone: string, met?: MetContext) => string;
   /** Claim a pending invite → confirmed connection. Returns the connection id. */
   claimPending: (pendingId: string) => string | undefined;
   /** Cancel a pending invite. */
@@ -277,7 +278,7 @@ export const useStore = create<AppState>()(
           return { user };
         }),
 
-      sendConnectRequest: (personId, note) => {
+      sendConnectRequest: (personId, note, met) => {
         const s = get();
         if (s.connections.some((c) => c.id === personId)) return { outcome: 'already' };
         const person = directory.find((d) => d.id === personId);
@@ -300,7 +301,7 @@ export const useStore = create<AppState>()(
 
         const connection: Connection = {
           ...person,
-          metContext: note ? `Connected via search · “${note}”` : 'Connected via search',
+          metContext: met ?? { event: 'Connected via search' },
           nudgeCadence: s.settings.defaultCadence,
         };
         set((st) => ({
@@ -321,7 +322,7 @@ export const useStore = create<AppState>()(
       ignoreIncoming: (requestId) =>
         set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) })),
 
-      createPendingInvite: (name, phone) => {
+      createPendingInvite: (name, phone, met) => {
         const id = genId();
         const today = todayISO();
         const pending: PendingConnection = {
@@ -331,6 +332,7 @@ export const useStore = create<AppState>()(
           createdAt: today,
           expiresAt: addDaysISO(today, 30),
           method: 'sms',
+          metContext: met,
         };
         set((s) => ({ pendingConnections: [pending, ...s.pendingConnections] }));
         return id;
@@ -358,7 +360,7 @@ export const useStore = create<AppState>()(
           },
           method: 'sms',
           connectionType: 'friend',
-          metContext: 'Joined from your invite',
+          metContext: pending.metContext ?? { event: 'Joined from your invite' },
           sharedContactInfo: [],
           nudgeCadence: 'monthly',
           lastContacted: null,
@@ -391,8 +393,8 @@ export const useStore = create<AppState>()(
         }),
     }),
     {
-      // Bumped to v5 for settings.
-      name: 'knowable-store-v5',
+      // Bumped to v6 for structured metContext (location/event) + graph-based mutuals.
+      name: 'knowable-store-v6',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,

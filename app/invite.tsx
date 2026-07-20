@@ -24,6 +24,8 @@ export default function InviteScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [metLocation, setMetLocation] = useState('');
+  const [metEvent, setMetEvent] = useState('');
 
   const user = useStore((s) => s.user);
   const pending = useStore((s) => s.pendingConnections);
@@ -33,9 +35,15 @@ export default function InviteScreen() {
   const send = () => {
     if (!name.trim() || !phone.trim()) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    createPendingInvite(name.trim(), phone.trim());
+    const met =
+      metLocation.trim() || metEvent.trim()
+        ? { location: metLocation.trim() || undefined, event: metEvent.trim() || undefined }
+        : undefined;
+    createPendingInvite(name.trim(), phone.trim(), met);
     setName('');
     setPhone('');
+    setMetLocation('');
+    setMetEvent('');
   };
 
   const messagePreview = `Hey! It’s ${user.name.split(' ')[0]} — connect with me on Knowable so we don’t lose touch: knowable.app/claim`;
@@ -82,6 +90,22 @@ export default function InviteScreen() {
       >
         <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
         <TextInput value={phone} onChangeText={setPhone} placeholder="Their number" keyboardType="phone-pad" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <TextInput
+            value={metLocation}
+            onChangeText={setMetLocation}
+            placeholder="Where'd you meet?"
+            placeholderTextColor={colors.textMutedOnLight}
+            style={[inputStyle, { flex: 1, minWidth: 0 }]}
+          />
+          <TextInput
+            value={metEvent}
+            onChangeText={setMetEvent}
+            placeholder="Occasion (optional)"
+            placeholderTextColor={colors.textMutedOnLight}
+            style={[inputStyle, { flex: 1, minWidth: 0 }]}
+          />
+        </View>
 
         {/* Pre-filled message preview (would open iMessage/SMS on device). */}
         <View style={{ backgroundColor: palette.offWhite, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>

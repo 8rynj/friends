@@ -32,6 +32,7 @@ import { handleMeta } from '../../src/data/mock';
 import { HandleSource, NudgeCadence } from '../../src/data/types';
 import { computeCommonalities } from '../../src/engine/commonality';
 import { nudgeCopy } from '../../src/engine/nudges';
+import { computeMutuals, formatMetContext } from '../../src/engine/social';
 import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 import { ConnectionType } from '../../src/data/types';
@@ -66,7 +67,8 @@ export default function ConnectionProfileScreen() {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const me = useStore((s) => s.user);
-  const connection = useStore((s) => s.connections.find((c) => c.id === String(id)));
+  const myConnections = useStore((s) => s.connections);
+  const connection = myConnections.find((c) => c.id === String(id));
   const logOutreach = useStore((s) => s.logOutreach);
   const setCadence = useStore((s) => s.setCadence);
   const setConnectionType = useStore((s) => s.setConnectionType);
@@ -83,6 +85,9 @@ export default function ConnectionProfileScreen() {
   // Computed live from both profiles (unlocks retroactively as profiles grow);
   // the connection type tunes which icebreakers surface (V1.5).
   const commonalities = computeCommonalities(me, user, 5, connection.connectionType);
+  // Real graph intersection — who's in both my connections and theirs (V2).
+  const mutuals = computeMutuals(myConnections, connection);
+  const metWhere = formatMetContext(connection.metContext);
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(120 + i * 90).springify().damping(16);
 
@@ -105,6 +110,13 @@ export default function ConnectionProfileScreen() {
         />
 
         <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.lg }}>
+          {/* Where you met — structured location/event, captured at connect time (V2). */}
+          {metWhere && (
+            <Text style={[type.body, { color: colors.textMutedOnLight }]}>
+              Where you met: {metWhere}
+            </Text>
+          )}
+
           {/* Contact buttons — row of three (§8). Tapping logs confirmed
               outreach (stamps last-contacted, reschedules the next nudge) then
               deep-links into the platform (§5D). */}
@@ -213,15 +225,15 @@ export default function ConnectionProfileScreen() {
             </Text>
           </View>
 
-          {/* Mutual connections (V1.5). */}
-          {connection.mutuals && connection.mutuals.length > 0 && (
+          {/* Mutual connections — computed from the real connection graph (V2). */}
+          {mutuals.length > 0 && (
             <View style={{ gap: spacing.sm }}>
               <Text style={[type.label, { color: colors.textMutedOnLight }]}>
-                {connection.mutuals.length} mutual
+                {mutuals.length} mutual
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {connection.mutuals.map((m) => (
-                  <Pill key={m} label={m} variant="default" />
+                {mutuals.map((m) => (
+                  <Pill key={m.id} label={m.name} variant="default" />
                 ))}
               </View>
             </View>
