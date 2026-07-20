@@ -21,6 +21,7 @@ import {
   NudgeResponse,
   OutgoingRequest,
   PendingConnection,
+  PulledData,
   User,
 } from '../data/types';
 import {
@@ -31,7 +32,7 @@ import {
   nudges as mockNudges,
   searchIgnorers,
 } from '../data/mock';
-import { simulatePull } from '../data/datapull';
+import { runDataPull, DataPullInput } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
 
 /** Result of sending a connect request (Search — Spec §5B Method 3). */
@@ -140,8 +141,13 @@ interface AppState {
   setCadence: (connectionId: string, cadence: NudgeCadence) => void;
   /** Set a connection's type (filters icebreakers, sharing, nudge copy — V1.5). */
   setConnectionType: (connectionId: string, type: ConnectionType) => void;
-  /** V1.5: connect a platform and pull (simulated) its signals onto the profile. */
-  connectDataPull: (source: DataPullSource) => void;
+  /**
+   * V1.5: connect a platform and pull its signals onto the profile. Runs a
+   * real adapter when one exists and `input` is supplied (e.g. a Letterboxd
+   * username), otherwise falls back to the simulated pull. Resolves with an
+   * error message on failure instead of writing anything to the profile.
+   */
+  connectDataPull: (source: DataPullSource, input?: DataPullInput) => Promise<{ ok: true } | { ok: false; error: string }>;
 
   // --- Connect flows (Spec §5B/§5C) ---
   /** Send a connect request to a directory person; resolves by disposition. */
@@ -264,18 +270,27 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      connectDataPull: (source) =>
+      connectDataPull: async (source, input) => {
+        let result: PulledData;
+        try {
+          result = await runDataPull(source, input);
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : 'Something went wrong.' };
+        }
         set((s) => {
-          const pulled = { ...s.user.pulled, ...simulatePull(source) };
+          const pulled = { ...s.user.pulled, ...result };
+          const value = input?.username?.trim();
           const handles = s.user.handles.some((h) => h.source === source)
             ? s.user.handles.map((h) =>
-                h.source === source ? { ...h, dataPulled: true } : h,
+                h.source === source ? { ...h, dataPulled: true, value: value || h.value } : h,
               )
-            : [...s.user.handles, { source, value: '', dataPulled: true }];
+            : [...s.user.handles, { source, value: value ?? '', dataPulled: true }];
           const user = { ...s.user, pulled, handles };
           user.profileCompletion = computeCompletion(user);
           return { user };
-        }),
+        });
+        return { ok: true };
+      },
 
       sendConnectRequest: (personId, note) => {
         const s = get();
