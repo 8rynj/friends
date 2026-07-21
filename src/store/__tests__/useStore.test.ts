@@ -144,8 +144,8 @@ describe('updateFacet', () => {
 });
 
 describe('connectDataPull', () => {
-  it('pulls signals onto the profile and marks the handle', () => {
-    useStore.getState().connectDataPull('linkedin');
+  it('pulls signals onto the profile and marks the handle', async () => {
+    await useStore.getState().connectDataPull('linkedin');
     const u = useStore.getState().user;
     expect(u.pulled?.linkedin?.company).toBe('Aperture');
     expect(u.handles.find((h) => h.source === 'linkedin')?.dataPulled).toBe(true);
