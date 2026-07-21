@@ -33,7 +33,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1A3A6B"
+        }
+      ],
       [
         "react-native-nfc-manager",
         {

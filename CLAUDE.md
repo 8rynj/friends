@@ -17,6 +17,8 @@ behind the same store API via env vars, and are no-ops until then — see
   (animations; needs `react-native-worklets`), **expo-haptics**, **expo-font**
 - **react-native-nfc-manager** (NFC bump — real tap-to-connect, `src/nfc/tapConnect.ts`)
   via its Expo config plugin, registered in `app.json` → `plugins`
+- **expo-notifications** + **expo-device** for push registration/deep links
+  (`src/notifications/`); the backend send function lives in `server/`
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
@@ -74,10 +76,13 @@ src/
   lib/                    supabase.ts (client + isSupabaseConfigured), auth.ts (phone OTP calls),
                           phone.ts (E.164 normalize/validate)
   engine/                 commonality.ts (the matching engine), nudges.ts
+  notifications/          push token registration, copy builders, tap-to-open deep links
   hooks/                  useReducedMotion
   nfc/                    tapConnect.ts — react-native-nfc-manager wrapper (native-only)
 supabase/
   schema.sql              users, connections, nudges, pending_connections, requests tables + RLS
+server/
+  sendPush.ts             Backend push-send function (Expo Push API) — not yet wired to a live backend
 ```
 
 ## Architecture notes
@@ -91,7 +96,7 @@ supabase/
   connection type (friend/professional/acquaintance/romantic).
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist
-  `name` version when the persisted shape changes (currently `knowable-store-v7`).
+  `name` version when the persisted shape changes (currently `knowable-store-v8`).
   Auth session state lives separately in `src/store/useAuthStore.ts` (mirrors
   Supabase's session, not app/profile data).
 - **NFC tap-to-connect (`src/nfc/tapConnect.ts`)** wraps `react-native-nfc-manager`;
@@ -103,6 +108,13 @@ supabase/
   later), then requires an explicit **Connect** tap (mutual confirmation) before
   `addConnection` → `/icebreaker`. A cancelled/failed scan surfaces inline, never
   silently no-ops.
+- **Push notifications (`src/notifications/`, `server/sendPush.ts`)** — the
+  client registers/clears an Expo push token as the Settings `pushNudges` /
+  `pushUpdates` toggles change (`app/_layout.tsx`), and routes a tapped
+  notification's `data.connectionId` to that connection's profile. The backend
+  send function (nudge/connection/new-commonality, Expo Push API) is real and
+  deployable but has no live caller yet — it's the shape the backend (once
+  built) calls after checking a recipient's stored settings.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -183,6 +195,10 @@ network calls, no sign-in screen).
 - **Yoga ≠ web layout:** the marquee single-line fix measures width off-screen
   and renders fixed-width copies because `alignSelf`/`numberOfLines` shrink-wrap
   differently than on web. Watch for similar web-vs-native layout gaps.
+- **Push tokens need an EAS project id.** `getExpoPushTokenAsync` wants
+  `extra.eas.projectId` in `app.json`; there isn't one yet (no EAS project
+  configured), so `registerForPushTokenAsync` fails closed (returns `null`)
+  rather than throwing. Real device tokens will start flowing once EAS is set up.
 
 ## Git / workflow
 
@@ -193,8 +209,7 @@ network calls, no sign-in screen).
 ## Not built yet
 
 Multi-user accounts (owner-scoped RLS), live data-pull integrations (currently
-simulated in `src/data/datapull.ts`), remote push notifications. Types are
-shaped to accommodate these.
+simulated in `src/data/datapull.ts`). Types are shaped to accommodate these.
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
 `react-native-nfc-manager` — but the id it reads is still resolved against the
@@ -206,6 +221,10 @@ Local nudge reminders ARE wired (`src/engine/notifications.ts` +
 reminder per connection's `nextNudge`, gated by the "Nudge reminders" setting
 and OS permission. Native-only (no-op on web), so it doesn't affect the web
 bundle/CI.
+
+Push notifications are scaffolded (`src/notifications/`, `server/sendPush.ts`)
+but not wired to a live backend — no EAS project id (so `registerForPushTokenAsync`
+fails closed), no server calling `sendPush.ts` yet.
 
 A Supabase-backed data layer and passwordless phone auth both exist (see
 above) but are single-tenant / keyed to a fixed dev user — multi-user support

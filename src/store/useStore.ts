@@ -126,6 +126,8 @@ interface AppState {
   pendingConnections: PendingConnection[];
   /** User settings & privacy preferences. */
   settings: Settings;
+  /** This device's Expo push token, once registered — null until a push setting is enabled and permission is granted. */
+  pushToken: string | null;
 
   setHasHydrated: (v: boolean) => void;
   /** Merge a profile patch and recompute completion (onboarding / editing). */
@@ -169,6 +171,10 @@ interface AppState {
   updateSettings: (patch: Partial<Settings>) => void;
   /** Reset all app data back to the seed state (mock sign-out). */
   resetApp: () => void;
+
+  // --- Push notifications ---
+  /** Store this device's Expo push token (or clear it, e.g. when all push settings are off). */
+  setPushToken: (token: string | null) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -184,6 +190,7 @@ export const useStore = create<AppState>()(
       incomingRequests: incomingRequestsSeed,
       pendingConnections: [],
       settings: DEFAULT_SETTINGS,
+      pushToken: null,
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
 
@@ -425,13 +432,17 @@ export const useStore = create<AppState>()(
           incomingRequests: incomingRequestsSeed,
           pendingConnections: [],
           settings: DEFAULT_SETTINGS,
+          pushToken: null,
           onboarded: true,
         }),
+
+      setPushToken: (token) => set({ pushToken: token }),
     }),
     {
-      // Bumped to v7 for User.phone (passwordless phone auth), on top of v6's
-      // structured metContext (location/event) + graph-based mutuals.
-      name: 'knowable-store-v7',
+      // Bumped to v8 for pushToken, on top of v7's User.phone (passwordless
+      // phone auth) and v6's structured metContext (location/event) +
+      // graph-based mutuals.
+      name: 'knowable-store-v8',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,
@@ -442,6 +453,7 @@ export const useStore = create<AppState>()(
         incomingRequests: s.incomingRequests,
         pendingConnections: s.pendingConnections,
         settings: s.settings,
+        pushToken: s.pushToken,
       }),
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },

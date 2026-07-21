@@ -19,6 +19,10 @@
  * configured (`useAuthStore` status is `unconfigured`), the gate is skipped
  * entirely and the app runs on mock data exactly as it did before phone auth
  * existed — see src/store/useAuthStore.ts.
+ *
+ * Also owns push notifications (§Notifications): registers/clears this
+ * device's Expo push token as the Settings toggles change, and routes tapped
+ * notifications to their connection profile (src/notifications/).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -37,6 +41,7 @@ import { ErrorBoundary } from '../src/components';
 import { useStore } from '../src/store/useStore';
 import { useNudgeReminders } from '../src/hooks/useNudgeReminders';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { registerForPushTokenAsync, useNotificationDeepLinks } from '../src/notifications';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -46,8 +51,13 @@ export default function RootLayout() {
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
   });
+  const router = useRouter();
   const hasHydrated = useStore((s) => s.hasHydrated);
   const completeProfile = useStore((s) => s.completeProfile);
+  const pushNudges = useStore((s) => s.settings.pushNudges);
+  const pushUpdates = useStore((s) => s.settings.pushUpdates);
+  const pushToken = useStore((s) => s.pushToken);
+  const setPushToken = useStore((s) => s.setPushToken);
 
   const initAuth = useAuthStore((s) => s.init);
   const authStatus = useAuthStore((s) => s.status);
@@ -62,6 +72,21 @@ export default function RootLayout() {
 
   // Keep local nudge reminders in sync with store state (native-only).
   useNudgeReminders();
+
+  useNotificationDeepLinks(router);
+
+  // Register (or clear) this device's push token as the Settings toggles change (§Notifications).
+  useEffect(() => {
+    if (!hasHydrated) return;
+    const pushEnabled = pushNudges || pushUpdates;
+    if (pushEnabled && !pushToken) {
+      registerForPushTokenAsync().then((token) => {
+        if (token) setPushToken(token);
+      });
+    } else if (!pushEnabled && pushToken) {
+      setPushToken(null);
+    }
+  }, [hasHydrated, pushNudges, pushUpdates, pushToken, setPushToken]);
 
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
@@ -84,7 +109,6 @@ export default function RootLayout() {
 
   const segments = useSegments();
   const pathname = usePathname();
-  const router = useRouter();
   const { redirect } = useGlobalSearchParams<{ redirect?: string }>();
 
   useEffect(() => {
