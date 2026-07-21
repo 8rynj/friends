@@ -22,6 +22,7 @@ import {
   ContactLogEntry,
   HandleSource,
   IncomingRequest,
+  MetContext,
   Nudge,
   NudgeCadence,
   NudgeResponse,
@@ -115,13 +116,13 @@ interface ConnectionRow {
   profile: User;
   method: ConnectionMethod;
   connection_type: ConnectionType;
-  met_context: string | null;
-  mutuals: string[] | null;
+  met_context: MetContext | null;
   shared_contact_info: HandleSource[] | null;
   nudge_cadence: NudgeCadence;
   last_contacted: string | null;
   next_nudge: string | null;
   contact_history: ContactLogEntry[];
+  archived: boolean;
 }
 
 function connectionToRow(ownerId: string, c: Connection): ConnectionRow {
@@ -132,12 +133,12 @@ function connectionToRow(ownerId: string, c: Connection): ConnectionRow {
     method: c.method,
     connection_type: c.connectionType,
     met_context: c.metContext ?? null,
-    mutuals: c.mutuals ?? null,
     shared_contact_info: c.sharedContactInfo,
     nudge_cadence: c.nudgeCadence,
     last_contacted: c.lastContacted,
     next_nudge: c.nextNudge,
     contact_history: c.contactHistory,
+    archived: c.archived ?? false,
   };
 }
 
@@ -148,12 +149,12 @@ function rowToConnection(row: ConnectionRow): Connection {
     method: row.method,
     connectionType: row.connection_type,
     metContext: row.met_context ?? undefined,
-    mutuals: row.mutuals ?? undefined,
     sharedContactInfo: row.shared_contact_info ?? [],
     nudgeCadence: row.nudge_cadence,
     lastContacted: row.last_contacted,
     nextNudge: row.next_nudge,
     contactHistory: row.contact_history ?? [],
+    archived: row.archived ?? false,
   };
 }
 

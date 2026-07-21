@@ -39,13 +39,15 @@ create table if not exists public.connections (
   profile jsonb not null,
   method text not null,
   connection_type text not null,
-  met_context text,
-  mutuals jsonb default '[]',
+  -- Structured { location?, event? } (src/data/types.ts MetContext), or null.
+  met_context jsonb,
   shared_contact_info jsonb default '[]',
   nudge_cadence text not null default 'monthly',
   last_contacted date,
   next_nudge date,
   contact_history jsonb not null default '[]',
+  -- "Not interested" archive (V2) — hidden but reversible, see src/data/types.ts.
+  archived boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
