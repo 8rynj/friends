@@ -8,7 +8,7 @@
  * and next-nudge per the follow-up flow.
  */
 import React from 'react';
-import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -71,6 +71,8 @@ export default function ConnectionProfileScreen() {
   const logOutreach = useStore((s) => s.logOutreach);
   const setCadence = useStore((s) => s.setCadence);
   const setConnectionType = useStore((s) => s.setConnectionType);
+  const archiveConnection = useStore((s) => s.archiveConnection);
+  const unarchiveConnection = useStore((s) => s.unarchiveConnection);
 
   if (!connection) {
     return (
@@ -293,6 +295,52 @@ export default function ConnectionProfileScreen() {
                 </View>
               ))}
             </View>
+          )}
+
+          {/* Not interested — archive mechanic (V2). Hides from Home/People and
+              pauses nudges without deleting the connection; always reversible. */}
+          {connection.archived ? (
+            <CollageCard background={palette.cream} rotate="0.4deg">
+              <Text style={[type.cardTitle, { color: colors.nearBlack }]}>Not interested</Text>
+              <Text style={[type.body, { color: colors.textMutedOnLight, marginTop: 4, marginBottom: 12 }]}>
+                Hidden from Home and paused for nudges.
+              </Text>
+              <Button
+                label="Move back to active"
+                variant="secondary"
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  unarchiveConnection(connection.id);
+                }}
+              />
+            </CollageCard>
+          ) : (
+            <Pressable
+              onPress={() => {
+                const doArchive = () => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  archiveConnection(connection.id);
+                  router.back();
+                };
+                if (Platform.OS === 'web') {
+                  doArchive();
+                } else {
+                  Alert.alert(
+                    'Not interested?',
+                    `${user.name} will be hidden from Home and you won't get nudges to reach out. You can undo this anytime from People.`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Not interested', style: 'destructive', onPress: doArchive },
+                    ],
+                  );
+                }
+              }}
+              style={{ alignSelf: 'center', paddingVertical: 8 }}
+            >
+              <Text style={[type.label, { color: colors.textMutedOnLight, textDecorationLine: 'underline' }]}>
+                Not interested
+              </Text>
+            </Pressable>
           )}
         </View>
       </ScrollView>

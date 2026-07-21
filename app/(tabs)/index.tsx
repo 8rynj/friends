@@ -46,15 +46,20 @@ export default function HomeScreen() {
   const reduced = useReducedMotion();
 
   const user = useStore((s) => s.user);
-  const connections = useStore((s) => s.connections);
+  const allConnections = useStore((s) => s.connections);
   const nudges = useStore((s) => s.nudges);
   const respondToNudge = useStore((s) => s.respondToNudge);
   const incomingRequests = useStore((s) => s.incomingRequests);
   const acceptIncoming = useStore((s) => s.acceptIncoming);
   const ignoreIncoming = useStore((s) => s.ignoreIncoming);
 
-  // Surface the first unresolved nudge, if any.
-  const openNudge = nudges.find((n) => n.response === null);
+  // "Not interested" connections are hidden from Home entirely (V2).
+  const connections = allConnections.filter((c) => !c.archived);
+
+  // Surface the first unresolved nudge, if any (never for an archived connection).
+  const openNudge = nudges.find(
+    (n) => n.response === null && connections.some((c) => c.id === n.connectionId),
+  );
   const nudgeConn = openNudge && connections.find((c) => c.id === openNudge.connectionId);
   const dueCount = connections.filter((c) => isDue(c.nextNudge)).length;
 
