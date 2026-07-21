@@ -3,8 +3,9 @@
 Knowable helps people turn good conversations into real friendships: capture a
 connection when you meet (NFC bump / search / SMS invite), surface what you have
 in common as icebreakers, and nudge timely follow-up. This repo is the React
-Native (Expo) app. It runs on **mock data by default** (no auth yet); a
-Supabase-backed data layer can be enabled behind the same store API — see
+Native (Expo) app. It runs on **mock data by default, no sign-in required** —
+a Supabase-backed data layer and passwordless phone auth can both be enabled
+behind the same store API via env vars, and are no-ops until then — see
 [Supabase (optional backend)](#supabase-optional-backend).
 
 ## Stack
@@ -55,7 +56,7 @@ screenshots are token-expensive — only use them for genuinely visual changes.
 
 ```
 app/                      Expo Router routes
-  _layout.tsx             Root stack; loads fonts; hides splash (see gotchas)
+  _layout.tsx             Root stack; loads fonts; hides splash; conditional auth gate (see gotchas)
   (tabs)/                 Bottom nav: index (Home), connections (People), you (You)
   onboarding/index.tsx    4-step dark-mode onboarding (name → hobbies → top 5 → handles)
   connection/[id].tsx     Connection profile (commonalities, cadence, type, mutuals)
@@ -64,12 +65,14 @@ app/                      Expo Router routes
   connect.tsx             V1.5 data-pull manager (simulated)
   edit/[facet].tsx        Parametrized profile-section editor
   settings.tsx            Settings & privacy
+  auth/phone.tsx, auth/verify.tsx   Passwordless phone sign-in (only reachable when Supabase is configured)
 src/
   theme/                  colors, typography, layout/motion tokens (reference roles, not hex)
   components/             collage design-system primitives + UI (barrel: index.ts)
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts,
                           repository.ts (Supabase repository behind the store)
-  lib/                    supabase.ts (client + isSupabaseConfigured)
+  lib/                    supabase.ts (client + isSupabaseConfigured), auth.ts (phone OTP calls),
+                          phone.ts (E.164 normalize/validate)
   engine/                 commonality.ts (the matching engine), nudges.ts
   hooks/                  useReducedMotion
   nfc/                    tapConnect.ts — react-native-nfc-manager wrapper (native-only)
@@ -88,7 +91,9 @@ supabase/
   connection type (friend/professional/acquaintance/romantic).
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist
-  `name` version when the persisted shape changes (currently `knowable-store-v5`).
+  `name` version when the persisted shape changes (currently `knowable-store-v7`).
+  Auth session state lives separately in `src/store/useAuthStore.ts` (mirrors
+  Supabase's session, not app/profile data).
 - **NFC tap-to-connect (`src/nfc/tapConnect.ts`)** wraps `react-native-nfc-manager`;
   every export is `Platform.OS === 'web'`-guarded so the native module is never
   required on web (would crash — RNW has no `NativeModules.NfcManager`). `app/add.tsx`
@@ -110,9 +115,11 @@ supabase/
 ## Supabase (optional backend)
 
 The Zustand store (`src/store/useStore.ts`) can be backed by Supabase without
-any screen or action changing. This is entirely additive and opt-in via env
-vars — with none set, the app behaves exactly as before (mock seed +
-AsyncStorage only, zero network calls).
+any screen or action changing, and passwordless phone auth (Auth → Providers →
+Phone + Twilio) can gate the app once that data layer exists. Both are
+entirely additive and opt-in via the same two env vars — with neither set,
+the app behaves exactly as before (mock seed + AsyncStorage only, zero
+network calls, no sign-in screen).
 
 **Setup:**
 
@@ -120,20 +127,23 @@ AsyncStorage only, zero network calls).
 2. In the SQL editor, run `supabase/schema.sql` — creates `users`,
    `connections`, `nudges`, `pending_connections`, `requests`, with RLS enabled
    and permissive dev policies (see the file's RLS comment — there's no
-   Supabase Auth yet, so policies aren't owner-scoped; tighten before shipping
-   with real users).
+   owner-scoping yet since sync is single-tenant; tighten before shipping
+   with real multi-user accounts).
 3. Copy `.env.example` to `.env.local` and fill in `EXPO_PUBLIC_SUPABASE_URL` /
    `EXPO_PUBLIC_SUPABASE_ANON_KEY` from the project's Settings → API page.
-4. Restart Metro (`npx expo start -c` to clear the env cache).
+4. To also enable phone sign-in, turn on Auth → Providers → Phone and set
+   Twilio as the SMS provider — same two env vars, no extra config.
+5. Restart Metro (`npx expo start -c` to clear the env cache).
 
 **How it works:**
 
 - `src/lib/supabase.ts` builds the client from the env vars; `isSupabaseConfigured`
-  is false (client is `null`) when either is missing.
+  is false (client is `null`) when either is missing. Everything below — data
+  sync and the auth gate — keys off this single flag.
 - `src/data/repository.ts` maps between the store's TypeScript shapes and the
   Supabase row shapes (a connection's embedded `user` profile is stored as a
-  `profile` jsonb column, not normalized — there's no auth/real accounts yet,
-  so connections aren't necessarily linked to another `users` row).
+  `profile` jsonb column, not normalized — sync is single-tenant, so
+  connections aren't necessarily linked to another `users` row).
 - `useStore.ts` calls the repository in exactly two places, both additive:
   once at module load to hydrate remote state over the local/mock state (and
   to seed a fresh project from the mock data if it's empty), and once via
@@ -141,7 +151,16 @@ AsyncStorage only, zero network calls).
   pending connections, requests) to Supabase in the background after every
   action. No store action was rewritten — this is why screens are unaffected.
 - Sync is single-user / single-tenant (owner id is always the seeded `me`
-  user's id) since there's no auth to key by yet — see "Not built yet" below.
+  user's id) until real multi-user auth + owner-scoped RLS lands.
+- **Auth gate (`app/_layout.tsx` + `src/store/useAuthStore.ts`):** when
+  `isSupabaseConfigured` is true, `useAuthStore` subscribes to
+  `supabase.auth.onAuthStateChange` and the root layout redirects every route
+  to `/auth/phone` while signed out (except the auth screens themselves and
+  the `claim/[id]` preview, which stays reachable per Spec §5C's "no account
+  needed to preview" — only the claim action itself requires sign-in). When
+  Supabase isn't configured, `useAuthStore.status` resolves straight to
+  `'unconfigured'` and the gate is skipped entirely — the app runs exactly as
+  it did before phone auth existed.
 
 ## Gotchas (learned the hard way)
 
@@ -173,14 +192,14 @@ AsyncStorage only, zero network calls).
 
 ## Not built yet
 
-SMS magic-link auth, real phone auth, live data-pull integrations (currently
+Multi-user accounts (owner-scoped RLS), live data-pull integrations (currently
 simulated in `src/data/datapull.ts`), remote push notifications. Types are
 shaped to accommodate these.
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
 `react-native-nfc-manager` — but the id it reads is still resolved against the
 local `newCandidates` mock pool rather than a backend directory, since there's
-no server yet.
+no multi-user backend yet.
 
 Local nudge reminders ARE wired (`src/engine/notifications.ts` +
 `src/hooks/useNudgeReminders.ts`): expo-notifications schedules an on-device
@@ -188,6 +207,7 @@ reminder per connection's `nextNudge`, gated by the "Nudge reminders" setting
 and OS permission. Native-only (no-op on web), so it doesn't affect the web
 bundle/CI.
 
-A Supabase-backed data layer exists (see above) but is single-tenant / keyed
-to a fixed dev user until real auth lands — multi-user support needs Supabase
-Auth + owner-scoped RLS policies.
+A Supabase-backed data layer and passwordless phone auth both exist (see
+above) but are single-tenant / keyed to a fixed dev user — multi-user support
+needs Supabase Auth-driven, owner-scoped RLS policies (today's policies are
+permissive dev defaults, not per-user).

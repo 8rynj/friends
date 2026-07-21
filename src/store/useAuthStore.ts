@@ -4,12 +4,18 @@
  * `supabase.auth.onAuthStateChange`, which (per supabase-js v2) fires once
  * immediately with the current session and again on every sign-in/out/refresh.
  * The root layout calls `init()` once and uses `status` to gate navigation.
+ *
+ * When Supabase isn't configured (`src/lib/supabase.ts` → `supabase` is
+ * null — no project/keys set, e.g. local dev or CI), status resolves straight
+ * to `unconfigured` and stays there: there's no session to track, and the
+ * root layout treats this the same as `signedIn` (skip the auth gate) so the
+ * app keeps working on mock data exactly as it did before phone auth existed.
  */
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
-export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'unconfigured';
 
 interface AuthState {
   status: AuthStatus;
@@ -25,6 +31,10 @@ export const useAuthStore = create<AuthState>()((set) => ({
   session: null,
   phone: null,
   init: () => {
+    if (!supabase) {
+      set({ status: 'unconfigured' });
+      return () => {};
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       set({
         session,
