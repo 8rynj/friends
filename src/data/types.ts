@@ -103,6 +103,8 @@ export interface Commonality {
 export interface User {
   id: string;
   name: string;
+  /** E.164 phone number, verified via Supabase phone auth (the account identity). */
+  phone?: string;
   /** Optional photo URI; when absent we render initials on a brand-color avatar. */
   photo?: string;
   /** Avatar background when no photo — a brand color, never gray (§5). */
@@ -194,6 +196,7 @@ export interface Connection {
 /** Pending connection tied to a phone number, 30-day expiry (Spec §5C, §8). */
 export interface PendingConnection {
   id: string;
+  /** E.164, e.g. "+15551234567" — matched against the claimant's verified auth phone. */
   phone: string;
   name?: string;
   createdAt: string; // ISO date
