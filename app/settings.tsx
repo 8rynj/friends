@@ -14,6 +14,7 @@ import { Button, CollageCard, OutlineText, Toggle } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { NudgeCadence } from '../src/data/types';
 import { Settings, useStore } from '../src/store/useStore';
+import { requestNudgePermissions } from '../src/engine/notifications';
 
 const CADENCES: NudgeCadence[] = ['weekly', 'monthly', 'quarterly', 'never'];
 
@@ -26,6 +27,26 @@ export default function SettingsScreen() {
   const resetApp = useStore((s) => s.resetApp);
 
   const set = (patch: Partial<Settings>) => updateSettings(patch);
+
+  // Turning nudge reminders on asks for OS permission first; if it's denied we
+  // leave the toggle off and point the user to their device settings. Off and
+  // web are simple state updates (no real notifications on web).
+  const setNudgeReminders = async (v: boolean) => {
+    if (!v || Platform.OS === 'web') {
+      set({ pushNudges: v });
+      return;
+    }
+    const granted = await requestNudgePermissions();
+    if (granted) {
+      set({ pushNudges: true });
+    } else {
+      set({ pushNudges: false });
+      Alert.alert(
+        'Notifications are off',
+        'Turn on notifications for Knowable in your device Settings to get nudge reminders.',
+      );
+    }
+  };
 
   const confirmReset = () => {
     if (Platform.OS === 'web') {
@@ -100,9 +121,9 @@ export default function SettingsScreen() {
         <Section title="Notifications">
           <ToggleRow
             label="Nudge reminders"
-            blurb="Push reminders to follow up with people."
+            blurb="Reminders to follow up with people, on each connection’s cadence."
             value={settings.pushNudges}
-            onChange={(v) => set({ pushNudges: v })}
+            onChange={setNudgeReminders}
           />
           <ToggleRow
             label="New commonalities"
