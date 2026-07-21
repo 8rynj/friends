@@ -1,13 +1,14 @@
 /**
  * Connect — V1.5 light data pull manager (Spec §6 / §8 Integrations).
  *
- * Lists the data-pull platforms; connecting one runs a (simulated) pull that
- * writes signals onto the profile and feeds the commonality engine. Connected
- * platforms show their pulled highlights. Real OAuth + APIs drop in behind
- * connectDataPull/simulatePull without changing this screen.
+ * Lists the data-pull platforms; connecting one pulls signals onto the
+ * profile and feeds the commonality engine. Letterboxd runs a real (unofficial,
+ * username-based) pull; every other source still runs the simulated dev
+ * fallback until it gets a real adapter. Connected platforms show their
+ * pulled highlights.
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Button, CollageCard, OutlineText, Pill, SkeletonBlock } from '../src/components';
@@ -54,14 +55,30 @@ export default function ConnectScreen() {
   const isConnected = (s: DataPullSource) =>
     handles.some((h) => h.source === s && h.dataPulled);
 
-  // The real pull is an API call in production (per file header); simulate the
-  // in-flight state here so the loading placeholder has somewhere to live.
+  // The remaining sources still run the simulated dev fallback (per file
+  // header); simulate the in-flight state here so the loading placeholder has
+  // somewhere to live.
   const pull = (s: DataPullSource) => {
     setPulling(s);
     setTimeout(() => {
       connectDataPull(s);
       setPulling(null);
     }, 700);
+  };
+
+  const [letterboxdUsername, setLetterboxdUsername] = useState(
+    () => handles.find((h) => h.source === 'letterboxd')?.value ?? '',
+  );
+  const [letterboxdPulling, setLetterboxdPulling] = useState(false);
+  const [letterboxdError, setLetterboxdError] = useState<string | null>(null);
+
+  const pullLetterboxd = async () => {
+    if (letterboxdPulling || !letterboxdUsername.trim()) return;
+    setLetterboxdPulling(true);
+    setLetterboxdError(null);
+    const result = await connectDataPull('letterboxd', { username: letterboxdUsername });
+    setLetterboxdPulling(false);
+    if (!result.ok) setLetterboxdError(result.error);
   };
 
   return (
@@ -112,12 +129,58 @@ export default function ConnectScreen() {
         {DATA_PULL_SOURCES.map((s, i) => {
           const connected = isConnected(s);
           const summary = connected ? pulledSummary(s, pulled) : null;
+          const rotate = i % 2 === 0 ? '-0.4deg' : '0.5deg';
+
+          if (s === 'letterboxd' && !connected) {
+            return (
+              <CollageCard key={s} background={palette.cream} rotate={rotate}>
+                <Text style={[type.cardTitle, { color: colors.nearBlack }]}>
+                  {handleMeta[s].label}
+                </Text>
+                <Text style={[type.body, { color: colors.textMutedOnLight, marginBottom: spacing.sm }]}>
+                  {dataPullBlurb[s]} — enter your public username
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <TextInput
+                    value={letterboxdUsername}
+                    onChangeText={(v) => {
+                      setLetterboxdUsername(v);
+                      setLetterboxdError(null);
+                    }}
+                    placeholder="username"
+                    placeholderTextColor={colors.textMutedOnLight}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{
+                      flex: 1,
+                      borderWidth: border.small,
+                      borderColor: colors.border,
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      color: colors.nearBlack,
+                      backgroundColor: colors.appBg,
+                      fontFamily: type.body.fontFamily,
+                      fontSize: type.body.fontSize,
+                    }}
+                  />
+                  <Button
+                    label={letterboxdPulling ? 'Pulling…' : 'Pull'}
+                    variant="primary"
+                    onPress={pullLetterboxd}
+                  />
+                </View>
+                {letterboxdError ? (
+                  <Text style={[type.body, { color: palette.orange, marginTop: 6 }]}>
+                    {letterboxdError}
+                  </Text>
+                ) : null}
+              </CollageCard>
+            );
+          }
+
           return (
-            <CollageCard
-              key={s}
-              background={connected ? palette.cream : palette.cream}
-              rotate={i % 2 === 0 ? '-0.4deg' : '0.5deg'}
-            >
+            <CollageCard key={s} background={palette.cream} rotate={rotate}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={[type.cardTitle, { color: colors.nearBlack }]}>

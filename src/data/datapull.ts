@@ -1,12 +1,18 @@
 /**
- * V1.5 light data pull — simulated (Spec §6 / §8 Integrations).
+ * V1.5 light data pull (Spec §6 / §8 Integrations).
  *
- * Real pulls require each platform's OAuth + API; here we return canned, but
- * realistic, signals so the commonality engine and UI can be built and demoed
- * now. The function shape matches what a real adapter would return, so swapping
- * in live APIs later is a drop-in replacement.
+ * `simulatePull` returns canned, realistic signals so the commonality engine
+ * and UI can be built and demoed without live platform access — used as the
+ * dev fallback for every source, and still the only path for sources without
+ * a real adapter yet. `runDataPull` is what screens should call: it routes to
+ * a real adapter when one exists and input is supplied, otherwise it falls
+ * back to `simulatePull`. Every path returns the same PulledData shape, so
+ * the engine/UI never need to know which one ran.
  */
 import { DataPullSource, PulledData } from './types';
+import { pullLetterboxd, LetterboxdError } from './adapters/letterboxd';
+
+export { LetterboxdError };
 
 /** Platforms that support light data pull, in display order. */
 export const DATA_PULL_SOURCES: DataPullSource[] = [
@@ -61,4 +67,22 @@ export function simulatePull(source: DataPullSource): PulledData {
     case 'linkedin':
       return { linkedin: { title: 'Product Designer', company: 'Aperture', industry: 'Design' } };
   }
+}
+
+/** Per-source input a real adapter needs to run (e.g. a public username). */
+export interface DataPullInput {
+  username?: string;
+}
+
+/**
+ * Runs a real pull when a source has a live adapter and the required input
+ * was supplied; otherwise falls back to `simulatePull`. Throws for a real
+ * adapter's own errors (e.g. profile not found) rather than silently
+ * substituting fake data under the user's real identity.
+ */
+export async function runDataPull(source: DataPullSource, input?: DataPullInput): Promise<PulledData> {
+  if (source === 'letterboxd' && input?.username?.trim()) {
+    return pullLetterboxd(input.username);
+  }
+  return simulatePull(source);
 }
