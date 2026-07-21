@@ -17,6 +17,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Avatar,
   CollageCard,
+  EmptyState,
   Fab,
   HalftoneEye,
   Marquee,
@@ -166,10 +167,17 @@ export default function HomeScreen() {
               rotate="-0.8deg"
               taped
               tapeSide="right"
-              onPress={() => router.push(`/connection/${nudgeConn.id}`)}
               style={{ paddingVertical: 16 }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {/* Tap the summary to view the profile; the response buttons below
+                  are separate controls, so this can't be a button nested inside
+                  a button (§ a11y). */}
+              <Pressable
+                onPress={() => router.push(`/connection/${nudgeConn.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${nudgeConn.user.name}'s profile`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
                 <Avatar name={nudgeConn.user.name} color={nudgeConn.user.avatarColor} size={48} />
                 <View style={{ flex: 1 }}>
                   <Pill
@@ -181,7 +189,7 @@ export default function HomeScreen() {
                     {openNudge.message}
                   </Text>
                 </View>
-              </View>
+              </Pressable>
 
               {/* "Did you reach out?" — Yes logs outreach, No reschedules (§5D). */}
               <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 14 }}>
@@ -199,6 +207,20 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
+        {!openNudge && connections.length > 0 && (
+          <View style={{ marginBottom: spacing.xl }}>
+            <Text style={[type.label, { color: colors.textMutedOnLight, marginBottom: spacing.sm }]}>
+              Today’s nudge
+            </Text>
+            <EmptyState
+              icon="🌱"
+              title="No nudges right now"
+              body="We’ll remind you when it’s time to follow up with someone."
+              rotate="0.6deg"
+            />
+          </View>
+        )}
+
         {/* Gamified deep-profile prompt — value left on the table (V1.5). */}
         <ProfileQuests user={user} variant="home" />
 
@@ -206,6 +228,15 @@ export default function HomeScreen() {
         <Text style={[type.headline, { color: colors.nearBlack, marginBottom: spacing.md }]}>
           Your people
         </Text>
+        {connections.length === 0 && (
+          <EmptyState
+            icon="👋"
+            title="No connections yet"
+            body="Bump, search, or invite someone to start building your people."
+            actionLabel="Add a connection"
+            onAction={() => router.push('/add')}
+          />
+        )}
         <View style={{ gap: spacing.md }}>
           {connections.map((c, i) => {
             const bg = cardBackgrounds[i % cardBackgrounds.length];
@@ -221,6 +252,7 @@ export default function HomeScreen() {
                   taped={i % 2 === 1}
                   tapeSide={i % 2 === 0 ? 'left' : 'right'}
                   onPress={() => router.push(`/connection/${c.id}`)}
+                  accessibilityLabel={`View ${c.user.name}'s profile`}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <Avatar name={c.user.name} color={c.user.avatarColor} size={46} />
@@ -267,6 +299,9 @@ function NudgeResponseButton({
         if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{
         flex: 1,
         alignItems: 'center',
@@ -300,6 +335,9 @@ function RequestButton({
         if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{
         flex: 1,
         alignItems: 'center',

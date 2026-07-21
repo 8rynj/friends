@@ -21,6 +21,7 @@ import {
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
 import { colors } from '../src/theme';
+import { ErrorBoundary } from '../src/components';
 import { useStore } from '../src/store/useStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -58,27 +59,29 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.cream },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="connection/[id]" />
-          <Stack.Screen name="edit/[facet]" />
-          <Stack.Screen name="connect" />
-          <Stack.Screen name="claim/[id]" />
-          <Stack.Screen name="add" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="find" />
-          <Stack.Screen name="invite" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="icebreaker" options={{ presentation: 'modal' }} />
-          <Stack.Screen
-            name="onboarding/index"
-            options={{ presentation: 'modal', contentStyle: { backgroundColor: colors.nearBlack } }}
-          />
-        </Stack>
+        <ErrorBoundary>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.cream },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="connection/[id]" />
+            <Stack.Screen name="edit/[facet]" />
+            <Stack.Screen name="connect" />
+            <Stack.Screen name="claim/[id]" />
+            <Stack.Screen name="add" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="find" />
+            <Stack.Screen name="invite" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="icebreaker" options={{ presentation: 'modal' }} />
+            <Stack.Screen
+              name="onboarding/index"
+              options={{ presentation: 'modal', contentStyle: { backgroundColor: colors.nearBlack } }}
+            />
+          </Stack>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

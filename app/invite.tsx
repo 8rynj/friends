@@ -10,7 +10,7 @@ import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { CollageCard, OutlineText, Pill } from '../src/components';
+import { CollageCard, EmptyState, OutlineText, Pill } from '../src/components';
 import { border, colors, fonts, palette, radii, spacing, type } from '../src/theme';
 import { useStore } from '../src/store/useStore';
 
@@ -54,13 +54,15 @@ export default function InviteScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Invite by</Text>
@@ -80,8 +82,8 @@ export default function InviteScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
-        <TextInput value={phone} onChangeText={setPhone} placeholder="Their number" keyboardType="phone-pad" placeholderTextColor={colors.textMutedOnLight} style={inputStyle} />
+        <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textMutedOnLight} accessibilityLabel="Their name" style={inputStyle} />
+        <TextInput value={phone} onChangeText={setPhone} placeholder="Their number" keyboardType="phone-pad" placeholderTextColor={colors.textMutedOnLight} accessibilityLabel="Their number" style={inputStyle} />
 
         {/* Pre-filled message preview (would open iMessage/SMS on device). */}
         <View style={{ backgroundColor: palette.offWhite, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>
@@ -92,19 +94,28 @@ export default function InviteScreen() {
         <Pressable
           onPress={send}
           disabled={!name.trim() || !phone.trim()}
+          accessibilityRole="button"
+          accessibilityLabel="Send invite"
+          accessibilityState={{ disabled: !name.trim() || !phone.trim() }}
           style={{
             opacity: !name.trim() || !phone.trim() ? 0.5 : 1,
             backgroundColor: colors.nearBlack, borderRadius: radii.pill,
-            borderWidth: 2, borderColor: colors.border, paddingVertical: 14, alignItems: 'center',
+            borderWidth: 2, borderColor: colors.border, paddingVertical: 14, minHeight: 44, alignItems: 'center', justifyContent: 'center',
           }}
         >
           <Text style={[type.label, { color: palette.offWhite, letterSpacing: 0.8 }]}>Send invite</Text>
         </Pressable>
 
-        {pending.length > 0 && (
-          <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-            <Text style={[type.label, { color: colors.textMutedOnLight }]}>Pending invites</Text>
-            {pending.map((p) => (
+        <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+          <Text style={[type.label, { color: colors.textMutedOnLight }]}>Pending invites</Text>
+          {pending.length === 0 ? (
+            <EmptyState
+              icon="✉️"
+              title="No pending invites"
+              body="Invites you send by text will show up here until they’re claimed."
+            />
+          ) : (
+            pending.map((p) => (
               <CollageCard key={p.id} background={palette.cream} rotate="-0.4deg">
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1 }}>
@@ -118,21 +129,27 @@ export default function InviteScreen() {
                 <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 12 }}>
                   <Pressable
                     onPress={() => router.push(`/claim/${p.id}`)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preview claim link for ${p.name ?? p.phone}`}
                     style={{ flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radii.pill, borderWidth: 2, borderColor: colors.border, backgroundColor: palette.navy }}
                   >
                     <Text style={[type.micro, { color: palette.cream }]}>Preview claim link</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => cancelPending(p.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Cancel invite for ${p.name ?? p.phone}`}
                     style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 16, borderRadius: radii.pill, borderWidth: 2, borderColor: colors.border }}
                   >
                     <Text style={[type.micro, { color: colors.nearBlack }]}>Cancel</Text>
                   </Pressable>
                 </View>
               </CollageCard>
-            ))}
-          </View>
-        )}
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );

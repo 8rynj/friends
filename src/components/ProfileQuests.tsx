@@ -51,7 +51,12 @@ export function ProfileQuests({ user, variant = 'full' }: ProfileQuestsProps) {
         <Text style={[type.label, { color: colors.textMutedOnLight, marginBottom: spacing.sm }]}>
           Level up your profile
         </Text>
-        <CollageCard background={palette.yellow} rotate="1deg" onPress={() => router.push(q.route)}>
+        <CollageCard
+          background={palette.yellow}
+          rotate="1deg"
+          onPress={() => router.push(q.route)}
+          accessibilityLabel={`${q.label}. Unlocks ${q.value.toLowerCase()}`}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[type.cardTitle, { color: colors.nearBlack }]}>{q.label}</Text>
@@ -71,7 +76,12 @@ export function ProfileQuests({ user, variant = 'full' }: ProfileQuestsProps) {
       <Text style={[type.label, { color: colors.textMutedOnLight }]}>Level up your profile</Text>
       <View style={{ gap: spacing.sm }}>
         {remaining.map((q) => (
-          <Pressable key={q.key} onPress={() => router.push(q.route)}>
+          <Pressable
+            key={q.key}
+            onPress={() => router.push(q.route)}
+            accessibilityRole="button"
+            accessibilityLabel={`${q.label}. Unlocks ${q.value.toLowerCase()}`}
+          >
             <CollageCard background={palette.cream} rotate="-0.4deg">
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1, paddingRight: 10 }}>

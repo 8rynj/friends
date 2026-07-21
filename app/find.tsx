@@ -11,7 +11,7 @@ import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Avatar, OutlineText } from '../src/components';
+import { Avatar, EmptyState, OutlineText } from '../src/components';
 import { border, colors, fonts, palette, radii, spacing, type } from '../src/theme';
 import { directory } from '../src/data/mock';
 import { useStore } from '../src/store/useStore';
@@ -66,13 +66,15 @@ export default function FindScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Find</Text>
@@ -97,6 +99,7 @@ export default function FindScreen() {
           onChangeText={setQuery}
           placeholder="Search by name…"
           placeholderTextColor={colors.textMutedOnLight}
+          accessibilityLabel="Search by name"
           style={inputStyle}
         />
         <TextInput
@@ -104,6 +107,7 @@ export default function FindScreen() {
           onChangeText={setNote}
           placeholder="Add a note (optional)"
           placeholderTextColor={colors.textMutedOnLight}
+          accessibilityLabel="Add a note (optional)"
           style={inputStyle}
         />
 
@@ -132,6 +136,10 @@ export default function FindScreen() {
               <Pressable
                 disabled={blocked}
                 onPress={() => send(d.id, d.user.name)}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${label} ${d.user.name}`}
+                accessibilityState={{ disabled: blocked }}
                 style={{
                   opacity: blocked ? 0.5 : 1,
                   backgroundColor: status === 'ignored' ? 'transparent' : colors.nearBlack,
@@ -148,7 +156,11 @@ export default function FindScreen() {
         })}
 
         {results.length === 0 && (
-          <Text style={[type.body, { color: colors.textMutedOnLight }]}>No one found by that name.</Text>
+          <EmptyState
+            icon="🔍"
+            title={q ? 'No one found' : 'No one to show'}
+            body={q ? `No one matches “${query.trim()}.”` : 'Everyone nearby is already in your people.'}
+          />
         )}
       </ScrollView>
     </View>

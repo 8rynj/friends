@@ -53,13 +53,15 @@ export default function SettingsScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Your</Text>
@@ -128,6 +130,10 @@ export default function SettingsScreen() {
                 <Pressable
                   key={cad}
                   onPress={() => set({ defaultCadence: cad })}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Default nudge cadence ${cad}`}
+                  accessibilityState={{ selected: active }}
                   style={{
                     backgroundColor: active ? palette.navy : 'transparent',
                     borderRadius: 100, borderWidth: 2, borderColor: colors.border,
@@ -145,7 +151,12 @@ export default function SettingsScreen() {
         <Section title="Account">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={[type.cardTitle, { color: colors.nearBlack }]}>{user.name}</Text>
-            <Pressable onPress={() => router.push('/onboarding')}>
+            <Pressable
+              onPress={() => router.push('/onboarding')}
+              hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+            >
               <Text style={[type.label, { color: colors.navy }]}>Edit profile</Text>
             </Pressable>
           </View>
@@ -184,7 +195,7 @@ function ToggleRow({
         <Text style={[type.cardTitle, { color: colors.nearBlack }]}>{label}</Text>
         <Text style={[type.body, { color: colors.textMutedOnLight }]}>{blurb}</Text>
       </View>
-      <Toggle value={value} onChange={onChange} />
+      <Toggle value={value} onChange={onChange} accessibilityLabel={label} />
     </View>
   );
 }

@@ -11,9 +11,10 @@ import { border, colors, palette } from '../theme';
 interface ToggleProps {
   value: boolean;
   onChange: (next: boolean) => void;
+  accessibilityLabel?: string;
 }
 
-export function Toggle({ value, onChange }: ToggleProps) {
+export function Toggle({ value, onChange, accessibilityLabel }: ToggleProps) {
   const W = 52;
   const H = 30;
   const knob = 22;
@@ -23,6 +24,10 @@ export function Toggle({ value, onChange }: ToggleProps) {
         if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
         onChange(!value);
       }}
+      hitSlop={{ top: 7, bottom: 7, left: 6, right: 6 }}
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: value }}
       style={{
         width: W,
         height: H,

@@ -41,6 +41,10 @@ export function HobbyChip({
         }
         onToggle();
       }}
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       style={{
         backgroundColor: selected ? selectedColor : 'transparent',
         borderRadius: radii.pill,

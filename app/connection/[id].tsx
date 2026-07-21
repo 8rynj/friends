@@ -16,6 +16,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Button,
   CollageCard,
+  ErrorState,
   Hero,
   Pill,
 } from '../../src/components';
@@ -73,8 +74,13 @@ export default function ConnectionProfileScreen() {
 
   if (!connection) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[type.headline, { color: colors.nearBlack }]}>Not found</Text>
+      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: spacing.screen }}>
+        <ErrorState
+          title="Connection not found"
+          body="This person isn’t in your people anymore."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }
@@ -161,6 +167,10 @@ export default function ConnectionProfileScreen() {
                       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                       setCadence(connection.id, cad);
                     }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Nudge me ${cad}`}
+                    accessibilityState={{ selected: active }}
                     style={{
                       backgroundColor: active ? palette.navy : 'transparent',
                       borderRadius: 100,
@@ -192,6 +202,10 @@ export default function ConnectionProfileScreen() {
                       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                       setConnectionType(connection.id, t);
                     }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Relationship ${t}`}
+                    accessibilityState={{ selected: active }}
                     style={{
                       backgroundColor: active ? palette.orange : 'transparent',
                       borderRadius: 100,

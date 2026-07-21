@@ -62,13 +62,15 @@ export default function AddScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Add a</Text>
@@ -93,6 +95,7 @@ export default function AddScreen() {
             background={m.bg}
             rotate={i % 2 === 0 ? '-1deg' : '1deg'}
             onPress={m.onPress}
+            accessibilityLabel={`${m.title}. ${m.blurb}`}
             style={{ paddingVertical: 18, opacity: 'disabled' in m && m.disabled ? 0.55 : 1 }}
           >
             <Text style={[type.cardTitle, { color: m.bg === palette.navy ? palette.offWhite : colors.nearBlack, fontSize: 17 }]}>
@@ -105,7 +108,13 @@ export default function AddScreen() {
         ))}
 
         {pending.length > 0 && (
-          <Pressable onPress={() => router.push('/invite')} style={{ marginTop: spacing.sm }}>
+          <Pressable
+            onPress={() => router.push('/invite')}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${pending.length} pending invite${pending.length > 1 ? 's' : ''}`}
+            style={{ marginTop: spacing.sm }}
+          >
             <Pill label={`${pending.length} pending invite${pending.length > 1 ? 's' : ''}`} variant="due" />
           </Pressable>
         )}
