@@ -202,7 +202,9 @@ network calls, no sign-in screen).
 
 ## Git / workflow
 
-- Work on branch **`claude/react-native-app-build-swtzi8`**; PR **#1** targets `main`.
+- All prior parallel feature branches have been consolidated onto `main`.
+  Work directly against `main` (or a short-lived feature branch off it) going
+  forward.
 - Commit + push when a unit of work is done and verified. Keep sessions scoped to
   one milestone; start a fresh session for the next (the repo is the context).
 
