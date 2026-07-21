@@ -12,14 +12,25 @@ Native (Expo) app. It currently runs on **mock data** (no backend/auth yet).
 - **Zustand** + **AsyncStorage** for state/persistence (`src/store/useStore.ts`)
 - **react-native-svg** (outline text, halftone, icons), **react-native-reanimated**
   (animations; needs `react-native-worklets`), **expo-haptics**, **expo-font**
+- **react-native-nfc-manager** (NFC bump — real tap-to-connect, `src/nfc/tapConnect.ts`)
+  via its Expo config plugin, registered in `app.json` → `plugins`
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
 
 ```bash
 npm install --legacy-peer-deps     # the flag is REQUIRED (SDK 56 react/react-dom peer mismatch)
-npx expo start                     # Metro; press i (iOS), w (web)
+npx expo start                     # Metro; press i (iOS), w (web) — NFC bump is a no-op here, see Gotchas
 npx expo run:ios                   # full native build + simulator (needs macOS + Xcode 16+)
+```
+
+NFC needs a real dev-client/prebuilt build on a **physical device** to test —
+regenerate native projects after touching the `react-native-nfc-manager` plugin
+config in `app.json`:
+
+```bash
+npx expo prebuild --clean          # picks up app.json plugin config (NFC entitlements/permissions)
+npx expo run:ios --device          # or run:android --device; install + launch on hardware
 ```
 
 Fast verification loop used in this project (no device needed):
@@ -57,6 +68,7 @@ src/
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts
   engine/                 commonality.ts (the matching engine), nudges.ts
   hooks/                  useReducedMotion
+  nfc/                    tapConnect.ts — react-native-nfc-manager wrapper (native-only)
 ```
 
 ## Architecture notes
@@ -71,6 +83,15 @@ src/
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist
   `name` version when the persisted shape changes (currently `knowable-store-v5`).
+- **NFC tap-to-connect (`src/nfc/tapConnect.ts`)** wraps `react-native-nfc-manager`;
+  every export is `Platform.OS === 'web'`-guarded so the native module is never
+  required on web (would crash — RNW has no `NativeModules.NfcManager`). `app/add.tsx`
+  gates the whole bump flow on `settings.nfcEnabled`, scans one NDEF tag
+  (`knowable:<personId>` text record), resolves the id against the local
+  `newCandidates` mock pool (no backend yet — swap for a real directory lookup
+  later), then requires an explicit **Connect** tap (mutual confirmation) before
+  `addConnection` → `/icebreaker`. A cancelled/failed scan surfaces inline, never
+  silently no-ops.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -92,6 +113,12 @@ src/
   **cold-relaunch** the app (kill it in the simulator and reopen).
 - **No `ios/` folder in git** (gitignored). Regenerate with
   `npx expo prebuild -p ios --clean`; bundle id is `com.knowable.app`.
+- **NFC only works in a dev-client/prebuilt build on real hardware** — not in
+  Expo Go (custom native module isn't present), not in the iOS/Android
+  simulators (no NFC radio), not on web. `isNfcAvailable()` resolves `false`
+  everywhere else so bump degrades to an in-app "NFC isn't available here"
+  message instead of throwing. iOS also needs a paid Apple Developer account
+  for the Core NFC entitlement to actually work on-device.
 - **Yoga ≠ web layout:** the marquee single-line fix measures width off-screen
   and renders fixed-width copies because `alignSelf`/`numberOfLines` shrink-wrap
   differently than on web. Watch for similar web-vs-native layout gaps.
@@ -104,9 +131,14 @@ src/
 
 ## Not built yet
 
-SMS magic-link auth, real NFC bump, backend/persistence, live data-pull
-integrations (currently simulated in `src/data/datapull.ts`), remote push
-notifications. Types are shaped to accommodate these.
+SMS magic-link auth, backend/persistence, live data-pull integrations
+(currently simulated in `src/data/datapull.ts`), remote push notifications.
+Types are shaped to accommodate these.
+
+NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
+`react-native-nfc-manager` — but the id it reads is still resolved against the
+local `newCandidates` mock pool rather than a backend directory, since there's
+no server yet.
 
 Local nudge reminders ARE wired (`src/engine/notifications.ts` +
 `src/hooks/useNudgeReminders.ts`): expo-notifications schedules an on-device
