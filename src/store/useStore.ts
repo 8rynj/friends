@@ -34,6 +34,8 @@ import {
 } from '../data/mock';
 import { simulatePull } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
+import { isSupabaseConfigured } from '../lib/supabase';
+import * as repository from '../data/repository';
 
 /** Result of sending a connect request (Search — Spec §5B Method 3). */
 export type RequestOutcome =
@@ -443,6 +445,54 @@ export const useStore = create<AppState>()(
     },
   ),
 );
+
+/**
+ * Supabase sync layer — entirely additive, no store action above is aware of
+ * it. When `isSupabaseConfigured` is false (no project/keys set, e.g. local
+ * dev or CI) this is a no-op and the app runs exactly as it did before: mock
+ * seed + AsyncStorage persistence only (see src/data/repository.ts).
+ *
+ * On load, remote state (once fetched) overwrites the local/mock state that
+ * rendered first; on every subsequent change, the affected slice is pushed to
+ * Supabase in the background.
+ */
+if (isSupabaseConfigured) {
+  const initial = useStore.getState();
+  repository
+    .loadOrSeedRemoteState({
+      onboarded: initial.onboarded,
+      user: initial.user,
+      connections: initial.connections,
+      nudges: initial.nudges,
+      outgoingRequests: initial.outgoingRequests,
+      incomingRequests: initial.incomingRequests,
+      pendingConnections: initial.pendingConnections,
+      settings: initial.settings,
+    })
+    .then((remote) => {
+      if (remote) useStore.setState(remote);
+    })
+    .catch((error) => console.warn('[supabase] initial hydrate failed, staying on local data', error));
+
+  useStore.subscribe((state, prev) => {
+    const ownerId = state.user.id;
+    if (state.user !== prev.user || state.onboarded !== prev.onboarded || state.settings !== prev.settings) {
+      repository.saveUserRow(state.user, state.onboarded, state.settings);
+    }
+    if (state.connections !== prev.connections) {
+      repository.saveConnections(ownerId, state.connections);
+    }
+    if (state.nudges !== prev.nudges) {
+      repository.saveNudges(ownerId, state.nudges);
+    }
+    if (state.pendingConnections !== prev.pendingConnections) {
+      repository.savePendingConnections(ownerId, state.pendingConnections);
+    }
+    if (state.outgoingRequests !== prev.outgoingRequests || state.incomingRequests !== prev.incomingRequests) {
+      repository.saveRequests(ownerId, state.outgoingRequests, state.incomingRequests);
+    }
+  });
+}
 
 /** Stable helper used across screens: is a connection's next nudge due today? */
 export function isDue(nextNudge: string | null): boolean {
