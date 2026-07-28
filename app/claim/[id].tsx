@@ -8,7 +8,12 @@
  *  - Directory preview: shows an app member who wants to connect, with
  *    engine-computed teaser commonalities.
  *
- * Either way: value is shown before any download is required.
+ * Either way: value is shown before any download is required — this screen is
+ * on the root layout's public-preview allowlist (`app/_layout.tsx`) so it's
+ * reachable while signed out. Only the claim action itself requires phone
+ * auth: tapping "Get Knowable & connect" while signed out routes to
+ * /auth/phone with a redirect back here, so the recipient verifies the same
+ * phone number the invite was sent to before the connection is created.
  */
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
@@ -18,13 +23,16 @@ import {
   Avatar,
   Button,
   CollageCard,
+  ErrorState,
   Hero,
   Pill,
 } from '../../src/components';
 import { cardBackgrounds, colors, palette, spacing, textOn, tiltFor, type } from '../../src/theme';
 import { connections as mockConnections, currentUser, directory, handleMeta } from '../../src/data/mock';
 import { computeCommonalities } from '../../src/engine/commonality';
+import { normalizePhone } from '../../src/lib/phone';
 import { useStore } from '../../src/store/useStore';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 function findInviter(id: string) {
   return [...mockConnections, ...directory].find((c) => c.id === id);
@@ -38,9 +46,23 @@ export default function ClaimScreen() {
   const me = useStore((s) => s.user);
   const pending = useStore((s) => s.pendingConnections.find((p) => p.id === String(id)));
   const claimPending = useStore((s) => s.claimPending);
+  const authStatus = useAuthStore((s) => s.status);
+  const authPhone = useAuthStore((s) => s.phone);
 
   // --- Pending-invite mode: recipient sees the inviter (current user). ---
   if (pending) {
+    const phoneMismatch =
+      authStatus === 'signedIn' && !!authPhone && authPhone !== normalizePhone(pending.phone);
+
+    const onClaim = () => {
+      if (authStatus !== 'signedIn') {
+        router.push({ pathname: '/auth/phone', params: { redirect: `/claim/${pending.id}` } });
+        return;
+      }
+      const cid = claimPending(pending.id, authPhone ?? undefined);
+      if (cid) router.replace(`/connection/${cid}`);
+    };
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.appBg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
@@ -61,17 +83,14 @@ export default function ClaimScreen() {
               ))}
             </View>
             <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-              <Button
-                label="Get Knowable & connect"
-                variant="primary"
-                fullWidth
-                onPress={() => {
-                  const cid = claimPending(pending.id);
-                  if (cid) router.replace(`/connection/${cid}`);
-                }}
-              />
+              <Button label="Get Knowable & connect" variant="primary" fullWidth onPress={onClaim} />
               <Button label="Maybe later" variant="secondary" fullWidth onPress={() => router.back()} />
             </View>
+            {phoneMismatch && (
+              <Text style={[type.body, { color: colors.orange, textAlign: 'center' }]}>
+                This invite was sent to {pending.phone} — you're signed in as {authPhone}.
+              </Text>
+            )}
             <Text style={[type.body, { color: colors.textMutedOnLight, textAlign: 'center' }]}>
               No account needed to preview. Connecting takes 60 seconds.
             </Text>
@@ -85,8 +104,13 @@ export default function ClaimScreen() {
   const inviter = findInviter(String(id));
   if (!inviter) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[type.headline, { color: colors.nearBlack }]}>Invite not found</Text>
+      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: spacing.screen }}>
+        <ErrorState
+          title="Invite not found"
+          body="This link may have expired or already been claimed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }

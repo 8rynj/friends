@@ -78,10 +78,12 @@ export function Hero({
         {onBack && (
           <Pressable
             onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
               backgroundColor: colors.cream,
               borderWidth: border.small,
               borderColor: colors.border,
@@ -89,7 +91,7 @@ export function Hero({
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
           </Pressable>
         )}
 

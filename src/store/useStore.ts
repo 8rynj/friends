@@ -17,10 +17,12 @@ import {
   DataPullSource,
   HandleSource,
   IncomingRequest,
+  MetContext,
   NudgeCadence,
   NudgeResponse,
   OutgoingRequest,
   PendingConnection,
+  PulledData,
   User,
 } from '../data/types';
 import {
@@ -31,9 +33,11 @@ import {
   nudges as mockNudges,
   searchIgnorers,
 } from '../data/mock';
-import { simulatePull } from '../data/datapull';
+import { runDataPull, DataPullInput } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
 import { palette } from '../theme/colors';
+import { isSupabaseConfigured } from '../lib/supabase';
+import * as repository from '../data/repository';
 
 /** Result of sending a connect request (Search — Spec §5B Method 3). */
 export type RequestOutcome =
@@ -124,6 +128,8 @@ interface AppState {
   pendingConnections: PendingConnection[];
   /** User settings & privacy preferences. */
   settings: Settings;
+  /** This device's Expo push token, once registered — null until a push setting is enabled and permission is granted. */
+  pushToken: string | null;
 
   setHasHydrated: (v: boolean) => void;
   /** Merge a profile patch and recompute completion (onboarding / editing). */
@@ -141,20 +147,29 @@ interface AppState {
   setCadence: (connectionId: string, cadence: NudgeCadence) => void;
   /** Set a connection's type (filters icebreakers, sharing, nudge copy — V1.5). */
   setConnectionType: (connectionId: string, type: ConnectionType) => void;
-  /** V1.5: connect a platform and pull (simulated) its signals onto the profile. */
-  connectDataPull: (source: DataPullSource) => void;
+  /** Mark "not interested": hides from Home/People and pauses nudges (V2). Reversible. */
+  archiveConnection: (connectionId: string) => void;
+  /** Undo an archive — restores default cadence and resumes nudges (V2). */
+  unarchiveConnection: (connectionId: string) => void;
+  /**
+   * V1.5: connect a platform and pull its signals onto the profile. Runs a
+   * real adapter when one exists and `input` is supplied (e.g. a Letterboxd
+   * username), otherwise falls back to the simulated pull. Resolves with an
+   * error message on failure instead of writing anything to the profile.
+   */
+  connectDataPull: (source: DataPullSource, input?: DataPullInput) => Promise<{ ok: true } | { ok: false; error: string }>;
 
   // --- Connect flows (Spec §5B/§5C) ---
   /** Send a connect request to a directory person; resolves by disposition. */
-  sendConnectRequest: (personId: string, note?: string) => RequestOutcome;
+  sendConnectRequest: (personId: string, note?: string, met?: MetContext) => RequestOutcome;
   /** Accept an incoming request → becomes a connection. Returns its id. */
   acceptIncoming: (requestId: string) => string | undefined;
   /** Ignore an incoming request. */
   ignoreIncoming: (requestId: string) => void;
   /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
-  createPendingInvite: (name: string, phone: string) => string;
-  /** Claim a pending invite → confirmed connection. Returns the connection id. */
-  claimPending: (pendingId: string) => string | undefined;
+  createPendingInvite: (name: string, phone: string, met?: MetContext) => string;
+  /** Claim a pending invite → confirmed connection, tagged with the claimant's verified phone. Returns the connection id. */
+  claimPending: (pendingId: string, claimantPhone?: string) => string | undefined;
   /** Cancel a pending invite. */
   cancelPending: (pendingId: string) => void;
 
@@ -163,6 +178,10 @@ interface AppState {
   updateSettings: (patch: Partial<Settings>) => void;
   /** Reset all app data back to the seed state (mock sign-out). */
   resetApp: () => void;
+
+  // --- Push notifications ---
+  /** Store this device's Expo push token (or clear it, e.g. when all push settings are off). */
+  setPushToken: (token: string | null) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -178,6 +197,7 @@ export const useStore = create<AppState>()(
       incomingRequests: incomingRequestsSeed,
       pendingConnections: [],
       settings: DEFAULT_SETTINGS,
+      pushToken: null,
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
 
@@ -265,20 +285,58 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      connectDataPull: (source) =>
+      archiveConnection: (connectionId) =>
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId
+              ? { ...c, archived: true, nudgeCadence: 'never' as const, nextNudge: null }
+              : c,
+          ),
+          // Drop any open nudge for this connection so it can't resurface on Home.
+          nudges: s.nudges.map((n) =>
+            n.connectionId === connectionId && n.response === null
+              ? { ...n, response: 'not_yet' as const, due: false }
+              : n,
+          ),
+        })),
+
+      unarchiveConnection: (connectionId) =>
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId
+              ? {
+                  ...c,
+                  archived: false,
+                  nudgeCadence: s.settings.defaultCadence,
+                  nextNudge: nextNudgeDate(c.lastContacted ?? todayISO(), s.settings.defaultCadence),
+                }
+              : c,
+          ),
+        })),
+
+      connectDataPull: async (source, input) => {
+        let result: PulledData;
+        try {
+          result = await runDataPull(source, input);
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : 'Something went wrong.' };
+        }
         set((s) => {
-          const pulled = { ...s.user.pulled, ...simulatePull(source) };
+          const pulled = { ...s.user.pulled, ...result };
+          const value = input?.username?.trim();
           const handles = s.user.handles.some((h) => h.source === source)
             ? s.user.handles.map((h) =>
-                h.source === source ? { ...h, dataPulled: true } : h,
+                h.source === source ? { ...h, dataPulled: true, value: value || h.value } : h,
               )
-            : [...s.user.handles, { source, value: '', dataPulled: true }];
+            : [...s.user.handles, { source, value: value ?? '', dataPulled: true }];
           const user = { ...s.user, pulled, handles };
           user.profileCompletion = computeCompletion(user);
           return { user };
-        }),
+        });
+        return { ok: true };
+      },
 
-      sendConnectRequest: (personId, note) => {
+      sendConnectRequest: (personId, note, met) => {
         const s = get();
         if (s.connections.some((c) => c.id === personId)) return { outcome: 'already' };
         const person = directory.find((d) => d.id === personId);
@@ -301,7 +359,7 @@ export const useStore = create<AppState>()(
 
         const connection: Connection = {
           ...person,
-          metContext: note ? `Connected via search · “${note}”` : 'Connected via search',
+          metContext: met ?? { event: 'Connected via search' },
           nudgeCadence: s.settings.defaultCadence,
         };
         set((st) => ({
@@ -322,7 +380,7 @@ export const useStore = create<AppState>()(
       ignoreIncoming: (requestId) =>
         set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) })),
 
-      createPendingInvite: (name, phone) => {
+      createPendingInvite: (name, phone, met) => {
         const id = genId();
         const today = todayISO();
         const pending: PendingConnection = {
@@ -332,12 +390,13 @@ export const useStore = create<AppState>()(
           createdAt: today,
           expiresAt: addDaysISO(today, 30),
           method: 'sms',
+          metContext: met,
         };
         set((s) => ({ pendingConnections: [pending, ...s.pendingConnections] }));
         return id;
       },
 
-      claimPending: (pendingId) => {
+      claimPending: (pendingId, claimantPhone) => {
         const pending = get().pendingConnections.find((p) => p.id === pendingId);
         if (!pending) return undefined;
         const id = `claimed-${pendingId}`;
@@ -346,6 +405,7 @@ export const useStore = create<AppState>()(
           user: {
             id,
             name: pending.name ?? pending.phone,
+            phone: claimantPhone ?? pending.phone,
             avatarColor: palette.navy,
             interests: [],
             hobbies: [],
@@ -359,7 +419,7 @@ export const useStore = create<AppState>()(
           },
           method: 'sms',
           connectionType: 'friend',
-          metContext: 'Joined from your invite',
+          metContext: pending.metContext ?? { event: 'Joined from your invite' },
           sharedContactInfo: [],
           nudgeCadence: 'monthly',
           lastContacted: null,
@@ -388,12 +448,17 @@ export const useStore = create<AppState>()(
           incomingRequests: incomingRequestsSeed,
           pendingConnections: [],
           settings: DEFAULT_SETTINGS,
+          pushToken: null,
           onboarded: true,
         }),
+
+      setPushToken: (token) => set({ pushToken: token }),
     }),
     {
-      // Bumped to v5 for settings.
-      name: 'knowable-store-v5',
+      // Bumped to v8 for pushToken, on top of v7's User.phone (passwordless
+      // phone auth) and v6's structured metContext (location/event) +
+      // graph-based mutuals.
+      name: 'knowable-store-v8',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,
@@ -404,11 +469,60 @@ export const useStore = create<AppState>()(
         incomingRequests: s.incomingRequests,
         pendingConnections: s.pendingConnections,
         settings: s.settings,
+        pushToken: s.pushToken,
       }),
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },
   ),
 );
+
+/**
+ * Supabase sync layer — entirely additive, no store action above is aware of
+ * it. When `isSupabaseConfigured` is false (no project/keys set, e.g. local
+ * dev or CI) this is a no-op and the app runs exactly as it did before: mock
+ * seed + AsyncStorage persistence only (see src/data/repository.ts).
+ *
+ * On load, remote state (once fetched) overwrites the local/mock state that
+ * rendered first; on every subsequent change, the affected slice is pushed to
+ * Supabase in the background.
+ */
+if (isSupabaseConfigured) {
+  const initial = useStore.getState();
+  repository
+    .loadOrSeedRemoteState({
+      onboarded: initial.onboarded,
+      user: initial.user,
+      connections: initial.connections,
+      nudges: initial.nudges,
+      outgoingRequests: initial.outgoingRequests,
+      incomingRequests: initial.incomingRequests,
+      pendingConnections: initial.pendingConnections,
+      settings: initial.settings,
+    })
+    .then((remote) => {
+      if (remote) useStore.setState(remote);
+    })
+    .catch((error) => console.warn('[supabase] initial hydrate failed, staying on local data', error));
+
+  useStore.subscribe((state, prev) => {
+    const ownerId = state.user.id;
+    if (state.user !== prev.user || state.onboarded !== prev.onboarded || state.settings !== prev.settings) {
+      repository.saveUserRow(state.user, state.onboarded, state.settings);
+    }
+    if (state.connections !== prev.connections) {
+      repository.saveConnections(ownerId, state.connections);
+    }
+    if (state.nudges !== prev.nudges) {
+      repository.saveNudges(ownerId, state.nudges);
+    }
+    if (state.pendingConnections !== prev.pendingConnections) {
+      repository.savePendingConnections(ownerId, state.pendingConnections);
+    }
+    if (state.outgoingRequests !== prev.outgoingRequests || state.incomingRequests !== prev.incomingRequests) {
+      repository.saveRequests(ownerId, state.outgoingRequests, state.incomingRequests);
+    }
+  });
+}
 
 /** Stable helper used across screens: is a connection's next nudge due today? */
 export function isDue(nextNudge: string | null): boolean {

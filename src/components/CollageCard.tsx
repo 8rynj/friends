@@ -27,6 +27,7 @@ interface CollageCardProps {
   /** Use the light tape variant (for dark card backgrounds). */
   tapeOnDark?: boolean;
   onPress?: () => void;
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -39,10 +40,14 @@ export function CollageCard({
   tapeSide = 'left',
   tapeOnDark,
   onPress,
+  accessibilityLabel,
   style,
 }: CollageCardProps) {
   const Inner = onPress ? Pressable : View;
   const isDarkBg = background === colors.nearBlack || background === colors.navy;
+  const a11yProps = onPress
+    ? { accessibilityRole: 'button' as const, accessibilityLabel }
+    : {};
 
   return (
     <HardShadow
@@ -60,6 +65,7 @@ export function CollageCard({
       )}
       <Inner
         onPress={onPress}
+        {...a11yProps}
         style={[
           {
             backgroundColor: background,

@@ -17,6 +17,7 @@ interface FabProps {
   size?: number;
   rotate?: string;
   bottom?: number;
+  accessibilityLabel?: string;
 }
 
 export function Fab({
@@ -26,6 +27,7 @@ export function Fab({
   size = 56,
   rotate = '6deg',
   bottom = 24,
+  accessibilityLabel = 'Add a connection',
 }: FabProps) {
   return (
     <HardShadow
@@ -45,6 +47,8 @@ export function Fab({
           }
           onPress?.();
         }}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         style={{
           width: size,
           height: size,
@@ -56,7 +60,10 @@ export function Fab({
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: size * 0.5, lineHeight: size * 0.56, color: textOn(color) }}>
+        <Text
+          allowFontScaling={false}
+          style={{ fontSize: size * 0.5, lineHeight: size * 0.56, color: textOn(color) }}
+        >
           {icon}
         </Text>
       </Pressable>

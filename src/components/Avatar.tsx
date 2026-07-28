@@ -63,9 +63,11 @@ export function Avatar({
       }}
     >
       {photo ? (
-        <Image source={{ uri: photo }} style={{ width: size, height: size }} />
+        <Image source={{ uri: photo }} accessible={false} style={{ width: size, height: size }} />
       ) : (
+        // Fixed circular glyph — don't let OS text scaling overflow the circle.
         <Text
+          allowFontScaling={false}
           style={{
             fontFamily: fonts.bold,
             fontSize: size * 0.38,

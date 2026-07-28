@@ -53,7 +53,10 @@ export function Sticker({
         style,
       ]}
     >
-      <Text style={[type.micro, { color: colors.nearBlack }]}>{label}</Text>
+      {/* Fixed circular badge — don't let OS text scaling overflow it. */}
+      <Text allowFontScaling={false} style={[type.micro, { color: colors.nearBlack }]}>
+        {label}
+      </Text>
     </View>
   );
 }

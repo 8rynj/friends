@@ -8,7 +8,7 @@
  * and next-nudge per the follow-up flow.
  */
 import React from 'react';
-import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +16,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Button,
   CollageCard,
+  ErrorState,
   Hero,
   Pill,
 } from '../../src/components';
@@ -32,6 +33,7 @@ import { handleMeta } from '../../src/data/mock';
 import { HandleSource, NudgeCadence } from '../../src/data/types';
 import { computeCommonalities } from '../../src/engine/commonality';
 import { nudgeCopy } from '../../src/engine/nudges';
+import { computeMutuals, formatMetContext } from '../../src/engine/social';
 import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 import { ConnectionType } from '../../src/data/types';
@@ -66,15 +68,23 @@ export default function ConnectionProfileScreen() {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const me = useStore((s) => s.user);
-  const connection = useStore((s) => s.connections.find((c) => c.id === String(id)));
+  const myConnections = useStore((s) => s.connections);
+  const connection = myConnections.find((c) => c.id === String(id));
   const logOutreach = useStore((s) => s.logOutreach);
   const setCadence = useStore((s) => s.setCadence);
   const setConnectionType = useStore((s) => s.setConnectionType);
+  const archiveConnection = useStore((s) => s.archiveConnection);
+  const unarchiveConnection = useStore((s) => s.unarchiveConnection);
 
   if (!connection) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[type.headline, { color: colors.nearBlack }]}>Not found</Text>
+      <View style={{ flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: spacing.screen }}>
+        <ErrorState
+          title="Connection not found"
+          body="This person isn’t in your people anymore."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }
@@ -83,6 +93,9 @@ export default function ConnectionProfileScreen() {
   // Computed live from both profiles (unlocks retroactively as profiles grow);
   // the connection type tunes which icebreakers surface (V1.5).
   const commonalities = computeCommonalities(me, user, 5, connection.connectionType);
+  // Real graph intersection — who's in both my connections and theirs (V2).
+  const mutuals = computeMutuals(myConnections, connection);
+  const metWhere = formatMetContext(connection.metContext);
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(120 + i * 90).springify().damping(16);
 
@@ -105,6 +118,13 @@ export default function ConnectionProfileScreen() {
         />
 
         <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.lg }}>
+          {/* Where you met — structured location/event, captured at connect time (V2). */}
+          {metWhere && (
+            <Text style={[type.body, { color: colors.textMutedOnLight }]}>
+              Where you met: {metWhere}
+            </Text>
+          )}
+
           {/* Contact buttons — row of three (§8). Tapping logs confirmed
               outreach (stamps last-contacted, reschedules the next nudge) then
               deep-links into the platform (§5D). */}
@@ -161,6 +181,10 @@ export default function ConnectionProfileScreen() {
                       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                       setCadence(connection.id, cad);
                     }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Nudge me ${cad}`}
+                    accessibilityState={{ selected: active }}
                     style={{
                       backgroundColor: active ? palette.navy : 'transparent',
                       borderRadius: 100,
@@ -192,6 +216,10 @@ export default function ConnectionProfileScreen() {
                       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                       setConnectionType(connection.id, t);
                     }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Relationship ${t}`}
+                    accessibilityState={{ selected: active }}
                     style={{
                       backgroundColor: active ? palette.orange : 'transparent',
                       borderRadius: 100,
@@ -213,15 +241,15 @@ export default function ConnectionProfileScreen() {
             </Text>
           </View>
 
-          {/* Mutual connections (V1.5). */}
-          {connection.mutuals && connection.mutuals.length > 0 && (
+          {/* Mutual connections — computed from the real connection graph (V2). */}
+          {mutuals.length > 0 && (
             <View style={{ gap: spacing.sm }}>
               <Text style={[type.label, { color: colors.textMutedOnLight }]}>
-                {connection.mutuals.length} mutual
+                {mutuals.length} mutual
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {connection.mutuals.map((m) => (
-                  <Pill key={m} label={m} variant="default" />
+                {mutuals.map((m) => (
+                  <Pill key={m.id} label={m.name} variant="default" />
                 ))}
               </View>
             </View>
@@ -279,6 +307,52 @@ export default function ConnectionProfileScreen() {
                 </View>
               ))}
             </View>
+          )}
+
+          {/* Not interested — archive mechanic (V2). Hides from Home/People and
+              pauses nudges without deleting the connection; always reversible. */}
+          {connection.archived ? (
+            <CollageCard background={palette.cream} rotate="0.4deg">
+              <Text style={[type.cardTitle, { color: colors.nearBlack }]}>Not interested</Text>
+              <Text style={[type.body, { color: colors.textMutedOnLight, marginTop: 4, marginBottom: 12 }]}>
+                Hidden from Home and paused for nudges.
+              </Text>
+              <Button
+                label="Move back to active"
+                variant="secondary"
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  unarchiveConnection(connection.id);
+                }}
+              />
+            </CollageCard>
+          ) : (
+            <Pressable
+              onPress={() => {
+                const doArchive = () => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  archiveConnection(connection.id);
+                  router.back();
+                };
+                if (Platform.OS === 'web') {
+                  doArchive();
+                } else {
+                  Alert.alert(
+                    'Not interested?',
+                    `${user.name} will be hidden from Home and you won't get nudges to reach out. You can undo this anytime from People.`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Not interested', style: 'destructive', onPress: doArchive },
+                    ],
+                  );
+                }
+              }}
+              style={{ alignSelf: 'center', paddingVertical: 8 }}
+            >
+              <Text style={[type.label, { color: colors.textMutedOnLight, textDecorationLine: 'underline' }]}>
+                Not interested
+              </Text>
+            </Pressable>
           )}
         </View>
       </ScrollView>

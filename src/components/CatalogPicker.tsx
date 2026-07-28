@@ -58,6 +58,7 @@ export function CatalogPicker({
         onChangeText={setQuery}
         placeholder="Search…"
         placeholderTextColor={labelColor}
+        accessibilityLabel="Search"
         style={{
           fontFamily: fonts.medium,
           fontSize: 15,
@@ -79,6 +80,10 @@ export function CatalogPicker({
             {/* Tap header to expand/collapse the category. */}
             <Pressable
               onPress={() => setOpen((o) => ({ ...o, [section.title]: !o[section.title] }))}
+              hitSlop={{ top: 12, bottom: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${section.title}${selectedCount > 0 ? `, ${selectedCount} selected` : ''}`}
+              accessibilityState={{ expanded }}
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

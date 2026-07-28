@@ -78,6 +78,14 @@ export type ConnectionType =
 /** How a connection was first captured (Spec §5B). */
 export type ConnectionMethod = 'nfc' | 'sms' | 'search';
 
+/** Where/when a connection was first met — structured location + event (V2, Spec §5B/§8). */
+export interface MetContext {
+  /** Physical or virtual place, e.g. "Climbing gym". */
+  location?: string;
+  /** Occasion/event, e.g. "Saturday group ride". */
+  event?: string;
+}
+
 /** A single shared point of common ground surfaced as an icebreaker (§3, §5B). */
 export interface Commonality {
   id: string;
@@ -95,6 +103,8 @@ export interface Commonality {
 export interface User {
   id: string;
   name: string;
+  /** E.164 phone number, verified via Supabase phone auth (the account identity). */
+  phone?: string;
   /** Optional photo URI; when absent we render initials on a brand-color avatar. */
   photo?: string;
   /** Avatar background when no photo — a brand color, never gray (§5). */
@@ -113,6 +123,13 @@ export interface User {
   pulled?: PulledData;
   /** V1.5: items recently added to this profile (drives new-commonality nudges). */
   recentlyAdded?: string[];
+  /**
+   * V2: ids of this person's own connections, from their side of the graph.
+   * Lets mutual-friend computation intersect real edges instead of a mocked
+   * list (§8). Only populated for other users' profiles, not the signed-in
+   * user — their own graph is the store's `connections` array.
+   */
+  connectionIds?: string[];
   /** 0–100, drives the onboarding/home completion indicator (§5A). */
   profileCompletion: number;
 }
@@ -153,10 +170,8 @@ export interface Connection {
   user: User;
   method: ConnectionMethod;
   connectionType: ConnectionType;
-  /** Where/when first met — free text for now (event/location context is V2). */
-  metContext?: string;
-  /** V1.5: mutual connections, surfaced on the profile (names for now). */
-  mutuals?: string[];
+  /** Where/when first met — structured location + event, captured at connect time (V2). */
+  metContext?: MetContext;
   /** Contact info this user has chosen to share back (asymmetrical, §5B). */
   sharedContactInfo: HandleSource[];
   /**
@@ -170,16 +185,25 @@ export interface Connection {
   /** ISO date of the next scheduled nudge. */
   nextNudge: string | null;
   contactHistory: ContactLogEntry[];
+  /**
+   * "Not interested" — user archived this connection (V2). Hidden from Home
+   * and the default People list, excluded from nudges/due counts, but kept
+   * (not deleted) and reversible from the Archived view.
+   */
+  archived?: boolean;
 }
 
 /** Pending connection tied to a phone number, 30-day expiry (Spec §5C, §8). */
 export interface PendingConnection {
   id: string;
+  /** E.164, e.g. "+15551234567" — matched against the claimant's verified auth phone. */
   phone: string;
   name?: string;
   createdAt: string; // ISO date
   expiresAt: string; // ISO date (createdAt + 30 days)
   method: ConnectionMethod;
+  /** V2: where/when they met, captured by the inviter and carried onto the claimed connection. */
+  metContext?: MetContext;
 }
 
 /** Lifecycle of an outgoing connect request (Search — Spec §5B Method 3). */

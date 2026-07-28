@@ -50,13 +50,15 @@ export default function YouScreen() {
           <Pressable
             onPress={() => router.push('/settings')}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
             style={{
-              width: 40, height: 40, borderRadius: 20,
+              width: 44, height: 44, borderRadius: 22,
               backgroundColor: colors.cream, borderWidth: 2, borderColor: colors.border,
               alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 18, color: colors.nearBlack }}>⚙</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack }}>⚙</Text>
           </Pressable>
         </View>
 
@@ -112,7 +114,12 @@ export default function YouScreen() {
                   ))}
                 </View>
               ) : (
-                <Pressable onPress={() => router.push(`/edit/${section.facet}`)}>
+                <Pressable
+                  onPress={() => router.push(`/edit/${section.facet}`)}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${section.label.toLowerCase()}`}
+                >
                   <Text style={[type.body, { color: colors.textMutedOnLight }]}>
                     + Add {section.label.toLowerCase()}
                   </Text>
@@ -145,7 +152,12 @@ function SectionHeader({ label, onEdit }: { label: string; onEdit: () => void })
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <Text style={[type.label, { color: colors.textMutedOnLight }]}>{label}</Text>
-      <Pressable onPress={onEdit} hitSlop={8}>
+      <Pressable
+        onPress={onEdit}
+        hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${label.toLowerCase()}`}
+      >
         <Text style={[type.label, { color: colors.navy }]}>Edit</Text>
       </Pressable>
     </View>

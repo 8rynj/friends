@@ -27,6 +27,9 @@ interface ButtonProps {
   fullWidth?: boolean;
   /** Leading glyph/emoji rendered before the label. */
   icon?: string;
+  /** Overrides the label read by screen readers (defaults to `label`). */
+  accessibilityLabel?: string;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -53,6 +56,8 @@ export function Button({
   variant = 'primary',
   fullWidth = false,
   icon,
+  accessibilityLabel,
+  disabled = false,
   style,
 }: ButtonProps) {
   const s = styleFor(variant);
@@ -87,6 +92,10 @@ export function Button({
         />
         <Pressable
           onPress={onPress}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityState={{ disabled }}
           onPressIn={() => {
             pressed.value = 1;
             if (Platform.OS !== 'web') {
@@ -101,6 +110,8 @@ export function Button({
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
+            minHeight: 44,
+            opacity: disabled ? 0.5 : 1,
             backgroundColor: s.bg,
             borderRadius: radii.pill,
             borderWidth: border.card,

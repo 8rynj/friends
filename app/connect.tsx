@@ -1,16 +1,17 @@
 /**
  * Connect — V1.5 light data pull manager (Spec §6 / §8 Integrations).
  *
- * Lists the data-pull platforms; connecting one runs a (simulated) pull that
- * writes signals onto the profile and feeds the commonality engine. Connected
- * platforms show their pulled highlights. Real OAuth + APIs drop in behind
- * connectDataPull/simulatePull without changing this screen.
+ * Lists the data-pull platforms; connecting one pulls signals onto the
+ * profile and feeds the commonality engine. Letterboxd runs a real (unofficial,
+ * username-based) pull; every other source still runs the simulated dev
+ * fallback until it gets a real adapter. Connected platforms show their
+ * pulled highlights.
  */
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Button, CollageCard, OutlineText, Pill } from '../src/components';
+import { Button, CollageCard, OutlineText, Pill, SkeletonBlock } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { DATA_PULL_SOURCES, dataPullBlurb } from '../src/data/datapull';
 import { handleMeta } from '../src/data/mock';
@@ -49,9 +50,36 @@ export default function ConnectScreen() {
   const pulled = usePulled();
   const handles = useStore((s) => s.user.handles);
   const connectDataPull = useStore((s) => s.connectDataPull);
+  const [pulling, setPulling] = useState<DataPullSource | null>(null);
 
   const isConnected = (s: DataPullSource) =>
     handles.some((h) => h.source === s && h.dataPulled);
+
+  // The remaining sources still run the simulated dev fallback (per file
+  // header); simulate the in-flight state here so the loading placeholder has
+  // somewhere to live.
+  const pull = (s: DataPullSource) => {
+    setPulling(s);
+    setTimeout(() => {
+      connectDataPull(s);
+      setPulling(null);
+    }, 700);
+  };
+
+  const [letterboxdUsername, setLetterboxdUsername] = useState(
+    () => handles.find((h) => h.source === 'letterboxd')?.value ?? '',
+  );
+  const [letterboxdPulling, setLetterboxdPulling] = useState(false);
+  const [letterboxdError, setLetterboxdError] = useState<string | null>(null);
+
+  const pullLetterboxd = async () => {
+    if (letterboxdPulling || !letterboxdUsername.trim()) return;
+    setLetterboxdPulling(true);
+    setLetterboxdError(null);
+    const result = await connectDataPull('letterboxd', { username: letterboxdUsername });
+    setLetterboxdPulling(false);
+    if (!result.ok) setLetterboxdError(result.error);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>
@@ -67,13 +95,15 @@ export default function ConnectScreen() {
       >
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
-            width: 40, height: 40, borderRadius: 20, marginTop: 6,
+            width: 44, height: 44, borderRadius: 22, marginTop: 6,
             backgroundColor: colors.cream, borderWidth: border.small, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 18, color: colors.nearBlack, lineHeight: 20 }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[type.display, { color: colors.nearBlack }]}>Connect your</Text>
@@ -99,12 +129,58 @@ export default function ConnectScreen() {
         {DATA_PULL_SOURCES.map((s, i) => {
           const connected = isConnected(s);
           const summary = connected ? pulledSummary(s, pulled) : null;
+          const rotate = i % 2 === 0 ? '-0.4deg' : '0.5deg';
+
+          if (s === 'letterboxd' && !connected) {
+            return (
+              <CollageCard key={s} background={palette.cream} rotate={rotate}>
+                <Text style={[type.cardTitle, { color: colors.nearBlack }]}>
+                  {handleMeta[s].label}
+                </Text>
+                <Text style={[type.body, { color: colors.textMutedOnLight, marginBottom: spacing.sm }]}>
+                  {dataPullBlurb[s]} — enter your public username
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <TextInput
+                    value={letterboxdUsername}
+                    onChangeText={(v) => {
+                      setLetterboxdUsername(v);
+                      setLetterboxdError(null);
+                    }}
+                    placeholder="username"
+                    placeholderTextColor={colors.textMutedOnLight}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{
+                      flex: 1,
+                      borderWidth: border.small,
+                      borderColor: colors.border,
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      color: colors.nearBlack,
+                      backgroundColor: colors.appBg,
+                      fontFamily: type.body.fontFamily,
+                      fontSize: type.body.fontSize,
+                    }}
+                  />
+                  <Button
+                    label={letterboxdPulling ? 'Pulling…' : 'Pull'}
+                    variant="primary"
+                    onPress={pullLetterboxd}
+                  />
+                </View>
+                {letterboxdError ? (
+                  <Text style={[type.body, { color: colors.nearBlack, marginTop: 6 }]}>
+                    {letterboxdError}
+                  </Text>
+                ) : null}
+              </CollageCard>
+            );
+          }
+
           return (
-            <CollageCard
-              key={s}
-              background={connected ? palette.cream : palette.cream}
-              rotate={i % 2 === 0 ? '-0.4deg' : '0.5deg'}
-            >
+            <CollageCard key={s} background={palette.cream} rotate={rotate}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={[type.cardTitle, { color: colors.nearBlack }]}>
@@ -116,8 +192,22 @@ export default function ConnectScreen() {
                 </View>
                 {connected ? (
                   <Pill label="Pulled ★" variant="connected" />
+                ) : pulling === s ? (
+                  <View
+                    style={{ width: 100 }}
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Connecting ${handleMeta[s].label}`}
+                  >
+                    <SkeletonBlock height={44} radius={100} />
+                  </View>
                 ) : (
-                  <Button label="Connect" variant="primary" onPress={() => connectDataPull(s)} />
+                  <Button
+                    label="Connect"
+                    variant="primary"
+                    onPress={() => pull(s)}
+                    accessibilityLabel={`Connect ${handleMeta[s].label}`}
+                  />
                 )}
               </View>
             </CollageCard>

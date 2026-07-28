@@ -17,6 +17,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Avatar,
   CollageCard,
+  EmptyState,
   Fab,
   HalftoneEye,
   Marquee,
@@ -36,6 +37,7 @@ import {
 } from '../../src/theme';
 import { marqueePhrases } from '../../src/data/mock';
 import { commonalityCount } from '../../src/engine/commonality';
+import { formatMetContext } from '../../src/engine/social';
 import { isDue, useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 
@@ -45,15 +47,20 @@ export default function HomeScreen() {
   const reduced = useReducedMotion();
 
   const user = useStore((s) => s.user);
-  const connections = useStore((s) => s.connections);
+  const allConnections = useStore((s) => s.connections);
   const nudges = useStore((s) => s.nudges);
   const respondToNudge = useStore((s) => s.respondToNudge);
   const incomingRequests = useStore((s) => s.incomingRequests);
   const acceptIncoming = useStore((s) => s.acceptIncoming);
   const ignoreIncoming = useStore((s) => s.ignoreIncoming);
 
-  // Surface the first unresolved nudge, if any.
-  const openNudge = nudges.find((n) => n.response === null);
+  // "Not interested" connections are hidden from Home entirely (V2).
+  const connections = allConnections.filter((c) => !c.archived);
+
+  // Surface the first unresolved nudge, if any (never for an archived connection).
+  const openNudge = nudges.find(
+    (n) => n.response === null && connections.some((c) => c.id === n.connectionId),
+  );
   const nudgeConn = openNudge && connections.find((c) => c.id === openNudge.connectionId);
   const dueCount = connections.filter((c) => isDue(c.nextNudge)).length;
 
@@ -166,10 +173,17 @@ export default function HomeScreen() {
               rotate="-0.8deg"
               taped
               tapeSide="right"
-              onPress={() => router.push(`/connection/${nudgeConn.id}`)}
               style={{ paddingVertical: 16 }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {/* Tap the summary to view the profile; the response buttons below
+                  are separate controls, so this can't be a button nested inside
+                  a button (§ a11y). */}
+              <Pressable
+                onPress={() => router.push(`/connection/${nudgeConn.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${nudgeConn.user.name}'s profile`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
                 <Avatar name={nudgeConn.user.name} color={nudgeConn.user.avatarColor} size={48} />
                 <View style={{ flex: 1 }}>
                   <Pill
@@ -181,7 +195,7 @@ export default function HomeScreen() {
                     {openNudge.message}
                   </Text>
                 </View>
-              </View>
+              </Pressable>
 
               {/* "Did you reach out?" — Yes logs outreach, No reschedules (§5D). */}
               <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 14 }}>
@@ -199,6 +213,20 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
+        {!openNudge && connections.length > 0 && (
+          <View style={{ marginBottom: spacing.xl }}>
+            <Text style={[type.label, { color: colors.textMutedOnLight, marginBottom: spacing.sm }]}>
+              Today’s nudge
+            </Text>
+            <EmptyState
+              icon="🌱"
+              title="No nudges right now"
+              body="We’ll remind you when it’s time to follow up with someone."
+              rotate="0.6deg"
+            />
+          </View>
+        )}
+
         {/* Gamified deep-profile prompt — value left on the table (V1.5). */}
         <ProfileQuests user={user} variant="home" />
 
@@ -206,6 +234,15 @@ export default function HomeScreen() {
         <Text style={[type.headline, { color: colors.nearBlack, marginBottom: spacing.md }]}>
           Your people
         </Text>
+        {connections.length === 0 && (
+          <EmptyState
+            icon="👋"
+            title="No connections yet"
+            body="Bump, search, or invite someone to start building your people."
+            actionLabel="Add a connection"
+            onAction={() => router.push('/add')}
+          />
+        )}
         <View style={{ gap: spacing.md }}>
           {connections.map((c, i) => {
             const bg = cardBackgrounds[i % cardBackgrounds.length];
@@ -221,13 +258,15 @@ export default function HomeScreen() {
                   taped={i % 2 === 1}
                   tapeSide={i % 2 === 0 ? 'left' : 'right'}
                   onPress={() => router.push(`/connection/${c.id}`)}
+                  accessibilityLabel={`View ${c.user.name}'s profile`}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <Avatar name={c.user.name} color={c.user.avatarColor} size={46} />
                     <View style={{ flex: 1 }}>
                       <Text style={[type.cardTitle, { color: fg }]}>{c.user.name}</Text>
                       <Text style={[type.body, { color: muted }]} numberOfLines={1}>
-                        {commonalityCount(user, c.user)} in common · {c.metContext}
+                        {commonalityCount(user, c.user)} in common
+                        {formatMetContext(c.metContext) ? ` · ${formatMetContext(c.metContext)}` : ''}
                       </Text>
                     </View>
                     {isDue(c.nextNudge) && <Pill label="Due" variant="due" />}
@@ -267,6 +306,9 @@ function NudgeResponseButton({
         if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{
         flex: 1,
         alignItems: 'center',
@@ -300,6 +342,9 @@ function RequestButton({
         if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{
         flex: 1,
         alignItems: 'center',

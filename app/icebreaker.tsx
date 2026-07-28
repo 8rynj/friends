@@ -129,7 +129,7 @@ export default function IcebreakerScreen() {
               },
             ]}
           >
-            <Text style={{ fontSize: 18 }}>⚡</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 18 }}>⚡</Text>
           </Animated.View>
           <Animated.View style={rightStyle}>
             <Avatar name={connection.user.name} color={connection.user.avatarColor} size={76} rotate="4deg" shadowed />

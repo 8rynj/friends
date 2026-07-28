@@ -37,6 +37,11 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
+      # Unit tests for the logic layers (commonality engine, nudges, store) via
+      # jest-expo. CI keeps Jest non-interactive and fails on empty test runs.
+      - name: Unit tests
+        run: npm test -- --ci
+
       # Bundles every route through Metro/Babel — catches import/runtime/config
       # errors. EXPO_OFFLINE avoids the version-check API; CI keeps it headless.
       - name: Web bundle
