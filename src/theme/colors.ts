@@ -25,12 +25,14 @@ export const palette = {
   orange: '#F4845C',
   /** Text on dark surfaces. Light avatar backgrounds. Secondary light surface. Same hex as cream. */
   offWhite: '#F2F0D2',
+  /** Minor decorative accent ONLY — tape, paper scraps. A true yellow, unlike the `yellow` key above. Never for functional UI (buttons, chips, badges) — those stay on the verified-contrast roles. */
+  paperYellow: '#FFE484',
 } as const;
 
 /** Translucent variants used by collage motifs (tape, scraps, halftone). */
 export const alpha = {
-  /** Accent tape on light backgrounds (0.85 opacity per §4.3). */
-  tapeOnLight: 'rgba(160, 206, 238, 0.85)',
+  /** Yellow tape on light backgrounds (0.85 opacity per §4.3). */
+  tapeOnLight: 'rgba(255, 228, 132, 0.85)',
   /** Light tape on dark backgrounds (§4.3). */
   tapeOnDark: 'rgba(242, 240, 210, 0.3)',
   /** Tape border. */

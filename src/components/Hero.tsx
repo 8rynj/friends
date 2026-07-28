@@ -72,7 +72,7 @@ export function Hero({
             back button or connected pill (§9). */}
         <HalftoneEye size={88} top={insets.top + 4} right={-12} opacity={0.07} />
         <PaperScrap top={insets.top + 16} right={128} size={22} color={palette.orange} rotate="-12deg" />
-        <PaperScrap top={insets.top + 44} right={156} size={14} color={palette.yellow} rotate="18deg" />
+        <PaperScrap top={insets.top + 44} right={156} size={14} color={palette.paperYellow} rotate="18deg" />
 
         {/* Back button — circular, cream, near-black border + shadow (§5). */}
         {onBack && (
