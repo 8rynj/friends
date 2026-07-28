@@ -171,7 +171,7 @@ export default function ConnectScreen() {
                   />
                 </View>
                 {letterboxdError ? (
-                  <Text style={[type.body, { color: palette.orange, marginTop: 6 }]}>
+                  <Text style={[type.body, { color: colors.nearBlack, marginTop: 6 }]}>
                     {letterboxdError}
                   </Text>
                 ) : null}

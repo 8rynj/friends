@@ -2,31 +2,37 @@
  * Knowable color system — Design Guidelines §2.
  *
  * Colors are used in large flat blocks, never as subtle accents and never as
- * gradients. Navy and near-black are the workhorses; everything else is accent.
- * Never use pure white — cream / off-white only.
+ * gradients. Black is the sole dark workhorse (navy and near-black are now the
+ * same hex); everything else is accent. Never use pure white — cream only.
+ *
+ * `navy`/`nearBlack` and `cream`/`offWhite` are intentionally identical pairs
+ * of keys — kept separate because call sites reference them by role (dominant
+ * vs. border, background vs. text-on-dark), not because the colors differ.
+ * `yellow` and `orange` keep their historical key names but no longer hold
+ * yellow/orange hex values — see each key's comment.
  */
 
 export const palette = {
-  /** Dominant color. Hero backgrounds, primary cards, active states. */
-  navy: '#1A3A6B',
+  /** Dominant color. Hero backgrounds, primary cards, active states. Same hex as nearBlack. */
+  navy: '#000000',
   /** All borders, shadows, dark cards, FAB background, text on light. */
-  nearBlack: '#1a1a1a',
+  nearBlack: '#000000',
   /** App background / paper base. Light card surfaces. Never pure white. */
-  cream: '#F0EBE0',
-  /** Accent ONLY — tape, badges, highlights, CTAs on dark. Never dominant. */
-  yellow: '#E8C547',
-  /** Destructive actions, "due" states, paper scraps, decorative pops. */
-  orange: '#D85A30',
-  /** Text on dark surfaces. Light avatar backgrounds. Secondary light surface. */
-  offWhite: '#F5F0E8',
+  cream: '#F2F0D2',
+  /** Accent ONLY — tape, badges, highlights, CTAs. Never dominant. Light blue, despite the key name. */
+  yellow: '#A0CEEE',
+  /** Destructive actions, "due" states, paper scraps, decorative pops. Coral, despite the key name. */
+  orange: '#F4845C',
+  /** Text on dark surfaces. Light avatar backgrounds. Secondary light surface. Same hex as cream. */
+  offWhite: '#F2F0D2',
 } as const;
 
 /** Translucent variants used by collage motifs (tape, scraps, halftone). */
 export const alpha = {
-  /** Yellow tape on light backgrounds (0.85 opacity per §4.3). */
-  tapeOnLight: 'rgba(232, 197, 71, 0.85)',
+  /** Accent tape on light backgrounds (0.85 opacity per §4.3). */
+  tapeOnLight: 'rgba(160, 206, 238, 0.85)',
   /** Light tape on dark backgrounds (§4.3). */
-  tapeOnDark: 'rgba(245, 240, 232, 0.3)',
+  tapeOnDark: 'rgba(242, 240, 210, 0.3)',
   /** Tape border. */
   tapeBorder: 'rgba(0, 0, 0, 0.15)',
   /** Paper scrap border (§4.5). */
@@ -44,7 +50,10 @@ export const colors = {
   appBg: palette.cream,
   appBgDark: palette.nearBlack, // onboarding only (§2 dark mode)
 
-  // Borders & shadows — always near-black or navy, never soft gray (§4.1)
+  // Borders & shadows — always near-black or navy, never soft gray (§4.1).
+  // shadowBlue is kept as a distinct role for call sites that want "the
+  // dominant-color shadow" but currently renders identically to `shadow`
+  // since navy and nearBlack share a hex.
   border: palette.nearBlack,
   shadow: palette.nearBlack,
   shadowBlue: palette.navy,
@@ -52,24 +61,32 @@ export const colors = {
   // Text
   textOnLight: palette.nearBlack,
   textOnDark: palette.offWhite,
-  textMutedOnDark: 'rgba(245, 240, 232, 0.55)',
-  textMutedOnLight: 'rgba(26, 26, 26, 0.55)',
+  textMutedOnDark: 'rgba(242, 240, 210, 0.55)',
+  textMutedOnLight: 'rgba(0, 0, 0, 0.55)',
 } as const;
 
-/** Card background rotation for stacks — cream → dark → yellow → navy (§5). */
+/**
+ * Card background rotation for stacks — cream → dark → accent (§5). Only 3
+ * entries: navy and nearBlack share a hex, so a 4th slot would just repeat
+ * the dark card and skew the rotation.
+ */
 export const cardBackgrounds = [
   palette.cream,
   palette.nearBlack,
   palette.yellow,
-  palette.navy,
 ] as const;
 
 export type CardBg = (typeof cardBackgrounds)[number];
 
-/** Returns appropriate text color for a given card background. */
+/**
+ * Returns appropriate text color for a given card background. Only navy /
+ * nearBlack are dark surfaces in this palette — cream, the accent (yellow
+ * key) and the destructive color (orange key) are all light enough to need
+ * dark text.
+ */
 export function textOn(bg: string): string {
-  if (bg === palette.cream || bg === palette.yellow || bg === palette.offWhite) {
-    return colors.textOnLight;
+  if (bg === palette.navy || bg === palette.nearBlack) {
+    return colors.textOnDark;
   }
-  return colors.textOnDark;
+  return colors.textOnLight;
 }

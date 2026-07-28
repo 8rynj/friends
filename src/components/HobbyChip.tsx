@@ -25,12 +25,12 @@ export function HobbyChip({
   selectedColor = palette.navy,
   onDark = true,
 }: HobbyChipProps) {
-  const unselectedFg = onDark ? 'rgba(245,240,232,0.7)' : colors.nearBlack;
-  const unselectedBorder = onDark ? 'rgba(245,240,232,0.25)' : colors.border;
+  const unselectedFg = onDark ? 'rgba(242, 240, 210,0.7)' : colors.nearBlack;
+  const unselectedBorder = onDark ? 'rgba(242, 240, 210,0.25)' : colors.border;
   const fg = selected
-    ? selectedColor === palette.yellow
-      ? colors.nearBlack
-      : palette.offWhite
+    ? selectedColor === palette.navy || selectedColor === palette.nearBlack
+      ? palette.offWhite
+      : colors.nearBlack
     : unselectedFg;
 
   return (

@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#1a1a1a",
+      "backgroundColor": "#000000",
       "resizeMode": "contain"
     },
     "ios": {
@@ -19,7 +19,7 @@
     "android": {
       "package": "com.knowable.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1A3A6B",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -37,7 +37,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#1A3A6B"
+          "color": "#000000"
         }
       ],
       [

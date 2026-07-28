@@ -1,9 +1,9 @@
 /**
  * Pill — Design Guidelines §5 (Pills and Tags). Fully pill-shaped, 10px bold
  * uppercase, always a visible border. Variants per the guidelines:
- *  - due:        orange bg, cream text
- *  - new:        navy bg, cream text
- *  - connected:  yellow bg, dark text (hero sections)
+ *  - due:        orange (coral) bg, dark text — coral is too light for cream text
+ *  - new:        navy (black) bg, cream text
+ *  - connected:  yellow (blue) bg, dark text (hero sections)
  *  - source:     light-tinted bg matching the source color, dark text
  *  - default:    cream bg, dark text
  */
@@ -28,7 +28,7 @@ function styleFor(variant: PillVariant, tint?: string): {
 } {
   switch (variant) {
     case 'due':
-      return { bg: palette.orange, fg: palette.cream, borderColor: colors.border };
+      return { bg: palette.orange, fg: colors.nearBlack, borderColor: colors.border };
     case 'new':
       return { bg: palette.navy, fg: palette.cream, borderColor: colors.border };
     case 'connected':

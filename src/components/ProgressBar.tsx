@@ -32,7 +32,7 @@ export function ProgressBar({ percent, showLabel = true, onDark = true }: Progre
         style={{
           height: 3,
           borderRadius: radii.pill,
-          backgroundColor: onDark ? 'rgba(245,240,232,0.18)' : 'rgba(26,26,26,0.12)',
+          backgroundColor: onDark ? 'rgba(242, 240, 210,0.18)' : 'rgba(0, 0, 0,0.12)',
           overflow: 'hidden',
         }}
       >

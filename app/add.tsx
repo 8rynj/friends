@@ -225,7 +225,7 @@ export default function AddScreen() {
 
           {status === 'error' && (
             <CollageCard background={palette.orange} rotate="0.4deg" style={{ alignItems: 'center', paddingVertical: 24 }}>
-              <Text style={[type.cardTitle, { color: palette.cream, textAlign: 'center' }]}>{errorMessage}</Text>
+              <Text style={[type.cardTitle, { color: colors.nearBlack, textAlign: 'center' }]}>{errorMessage}</Text>
               <View style={{ gap: spacing.sm, marginTop: spacing.md, alignSelf: 'stretch' }}>
                 <Button label="Try again" variant="secondary" onPress={bump} />
                 <Button label="Dismiss" variant="secondary" onPress={dismiss} />

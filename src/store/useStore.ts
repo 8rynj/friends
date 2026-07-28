@@ -35,6 +35,7 @@ import {
 } from '../data/mock';
 import { runDataPull, DataPullInput } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
+import { palette } from '../theme/colors';
 import { isSupabaseConfigured } from '../lib/supabase';
 import * as repository from '../data/repository';
 
@@ -405,7 +406,7 @@ export const useStore = create<AppState>()(
             id,
             name: pending.name ?? pending.phone,
             phone: claimantPhone ?? pending.phone,
-            avatarColor: '#1A3A6B',
+            avatarColor: palette.navy,
             interests: [],
             hobbies: [],
             topHobbies: [],

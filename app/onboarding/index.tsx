@@ -130,9 +130,9 @@ export default function OnboardingScreen() {
                   fontFamily: fonts.bold,
                   fontSize: 18,
                   color: palette.offWhite,
-                  backgroundColor: 'rgba(245,240,232,0.06)',
+                  backgroundColor: 'rgba(242, 240, 210,0.06)',
                   borderWidth: border.small,
-                  borderColor: 'rgba(245,240,232,0.3)',
+                  borderColor: 'rgba(242, 240, 210,0.3)',
                   borderRadius: 14,
                   paddingHorizontal: 16,
                   paddingVertical: 14,
@@ -236,7 +236,7 @@ export default function OnboardingScreen() {
                       backgroundColor: handles.includes(s) ? palette.yellow : 'transparent',
                       borderRadius: 100,
                       borderWidth: border.small,
-                      borderColor: handles.includes(s) ? colors.border : 'rgba(245,240,232,0.25)',
+                      borderColor: handles.includes(s) ? colors.border : 'rgba(242, 240, 210,0.25)',
                       paddingVertical: 10,
                       paddingHorizontal: 16,
                     }}
@@ -245,7 +245,7 @@ export default function OnboardingScreen() {
                       style={{
                         fontFamily: fonts.bold,
                         fontSize: 13,
-                        color: handles.includes(s) ? colors.nearBlack : 'rgba(245,240,232,0.7)',
+                        color: handles.includes(s) ? colors.nearBlack : 'rgba(242, 240, 210,0.7)',
                       }}
                     >
                       {handleMeta[s].label}

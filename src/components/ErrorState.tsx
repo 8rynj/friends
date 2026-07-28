@@ -42,7 +42,7 @@ export function ErrorState({
             transform: [{ rotate: '4deg' }],
           }}
         >
-          <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '700', color: palette.cream }}>!</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '700', color: colors.nearBlack }}>!</Text>
         </View>
         <Text style={[type.cardTitle, { color: colors.nearBlack, fontSize: 16, textAlign: 'center' }]}>
           {title}

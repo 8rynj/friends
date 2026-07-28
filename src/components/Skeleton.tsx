@@ -56,7 +56,7 @@ export function SkeletonCard({ rotate = '0deg' }: { rotate?: string }) {
         backgroundColor: colors.cream,
         borderRadius: radii.card,
         borderWidth: 2,
-        borderColor: 'rgba(26,26,26,0.15)',
+        borderColor: 'rgba(0,0,0,0.15)',
         padding: 15,
         transform: [{ rotate }],
       }}
