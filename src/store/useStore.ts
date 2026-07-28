@@ -33,6 +33,7 @@ import {
 } from '../data/mock';
 import { simulatePull } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
+import { palette } from '../theme/colors';
 
 /** Result of sending a connect request (Search — Spec §5B Method 3). */
 export type RequestOutcome =
@@ -345,7 +346,7 @@ export const useStore = create<AppState>()(
           user: {
             id,
             name: pending.name ?? pending.phone,
-            avatarColor: '#1A3A6B',
+            avatarColor: palette.navy,
             interests: [],
             hobbies: [],
             topHobbies: [],

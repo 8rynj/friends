@@ -201,7 +201,7 @@ export default function ConnectionProfileScreen() {
                       paddingHorizontal: 14,
                     }}
                   >
-                    <Text style={[type.micro, { color: active ? palette.cream : colors.nearBlack }]}>
+                    <Text style={[type.micro, { color: colors.nearBlack }]}>
                       {t}
                     </Text>
                   </Pressable>

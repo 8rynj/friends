@@ -109,7 +109,7 @@ export default function FindScreen() {
 
         {flash && (
           <View style={{ backgroundColor: palette.orange, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>
-            <Text style={[type.body, { color: palette.cream }]}>{flash}</Text>
+            <Text style={[type.body, { color: colors.nearBlack }]}>{flash}</Text>
           </View>
         )}
 

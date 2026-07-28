@@ -5,7 +5,7 @@
 import React from 'react';
 import { Platform, Pressable, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { border, colors, palette } from '../theme';
+import { border, colors, palette, textOn } from '../theme';
 import { HardShadow } from './HardShadow';
 
 interface FabProps {
@@ -56,7 +56,7 @@ export function Fab({
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: size * 0.5, lineHeight: size * 0.56, color: palette.cream }}>
+        <Text style={{ fontSize: size * 0.5, lineHeight: size * 0.56, color: textOn(color) }}>
           {icon}
         </Text>
       </Pressable>
