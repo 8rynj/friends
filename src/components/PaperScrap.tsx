@@ -13,8 +13,8 @@ interface PaperScrapProps {
   left?: number;
   right?: number;
   size?: number;
-  /** Burnt orange or yellow only (§4.5). */
-  color?: typeof palette.orange | typeof palette.yellow;
+  /** Coral or the decorative paper-yellow only (§4.5). */
+  color?: typeof palette.orange | typeof palette.paperYellow;
   rotate?: string;
 }
 
