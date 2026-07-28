@@ -1,0 +1,51 @@
+name: CI
+
+# Runs on every pull request (and on each push to the PR's branch) plus pushes
+# to main after merge.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Typecheck & web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The project has a known react / react-dom peer mismatch in Expo SDK 56,
+      # so installs use --legacy-peer-deps (same as local + `expo install`).
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      # Unit tests for the logic layers (commonality engine, nudges, store) via
+      # jest-expo. CI keeps Jest non-interactive and fails on empty test runs.
+      - name: Unit tests
+        run: npm test -- --ci
+
+      # Bundles every route through Metro/Babel — catches import/runtime/config
+      # errors. EXPO_OFFLINE avoids the version-check API; CI keeps it headless.
+      - name: Web bundle
+        run: npx expo export --platform web
+        env:
+          EXPO_OFFLINE: "1"
+          CI: "1"

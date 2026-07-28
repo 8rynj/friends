@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // expo/tsconfig.base sets moduleDetection:"force", which suppresses the
+    // automatic inclusion of @types/jest globals (describe/it/expect) in the
+    // test files. List it explicitly so `tsc --noEmit` typechecks the tests.
+    // App code pulls in @types/react etc. via imports, so scoping globals to
+    // jest doesn't affect it.
+    "types": ["jest"]
+  }
+}
