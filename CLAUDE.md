@@ -236,8 +236,12 @@ cadence), `accept_request`, `search_profiles`.
 
 ## Not built yet
 
-Multi-user accounts (owner-scoped RLS), live data-pull integrations (currently
-simulated in `src/data/datapull.ts`). Types are shaped to accommodate these.
+Live data-pull integrations (currently simulated in `src/data/datapull.ts`).
+Types are shaped to accommodate these. (Multi-user accounts and owner-scoped
+`auth.uid()` RLS are **built** — see the Supabase section above. The remaining
+backend gap is wiring connection *creation* — NFC bump, Search send/accept,
+SMS-invite claim — to the real directory instead of the mock pool, detailed at
+the end of this section.)
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
 `react-native-nfc-manager` — but the id it reads is still resolved against the
