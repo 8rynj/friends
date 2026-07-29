@@ -22,6 +22,8 @@ interface AuthState {
   session: Session | null;
   /** E.164 phone of the signed-in user, straight from the verified session. */
   phone: string | null;
+  /** The authenticated `auth.uid()` — also `profiles.id` (see supabase/migrations). */
+  userId: string | null;
   /** Subscribes to auth changes; returns an unsubscribe function. */
   init: () => () => void;
 }
@@ -30,6 +32,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   status: 'loading',
   session: null,
   phone: null,
+  userId: null,
   init: () => {
     if (!supabase) {
       set({ status: 'unconfigured' });
@@ -39,6 +42,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       set({
         session,
         phone: session?.user?.phone ? `+${session.user.phone.replace(/^\+/, '')}` : null,
+        userId: session?.user?.id ?? null,
         status: session ? 'signedIn' : 'signedOut',
       });
     });
