@@ -14,7 +14,7 @@ import { Button, CollageCard, OutlineText, Toggle } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { NudgeCadence } from '../src/data/types';
 import { signOutPhone } from '../src/lib/auth';
-import { Settings, useStore } from '../src/store/useStore';
+import { Settings, stopSupabaseSync, useStore } from '../src/store/useStore';
 import { requestNudgePermissions } from '../src/engine/notifications';
 import { useAuthStore } from '../src/store/useAuthStore';
 
@@ -52,6 +52,10 @@ export default function SettingsScreen() {
   };
 
   const signOut = async () => {
+    // Stop syncing before wiping local state back to the mock seed — otherwise
+    // the reset would read as real deletes (e.g. pending invites) and push
+    // them to Supabase before the session even finishes clearing.
+    stopSupabaseSync();
     resetApp();
     await signOutPhone().catch(() => {});
     // The root layout's auth-state subscription redirects to /auth/phone

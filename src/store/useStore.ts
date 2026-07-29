@@ -57,7 +57,18 @@ const addDaysISO = (iso: string, days: number) => {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 };
-const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+/**
+ * RFC4122 v4-shaped id. Locally-created connections/pending-invites/etc. may
+ * end up as primary keys in Supabase's uuid-typed tables (see
+ * src/data/repository.ts), so every client-generated id needs to look like a
+ * real uuid even before/without a backend.
+ */
+const genId = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 
 /** Next nudge date from a base date + cadence (null when cadence is "never"). */
 function nextNudgeDate(base: string, cadence: NudgeCadence): string | null {
@@ -228,9 +239,9 @@ export const useStore = create<AppState>()(
 
       isConnected: (id) => get().connections.some((c) => c.id === id),
 
-      logOutreach: (connectionId, via, note) =>
+      logOutreach: (connectionId, via, note) => {
+        const today = todayISO();
         set((s) => {
-          const today = todayISO();
           const entry: ContactLogEntry = { id: genId(), date: today, via, note };
           const connections = s.connections.map((c) =>
             c.id === connectionId
@@ -249,13 +260,24 @@ export const useStore = create<AppState>()(
               : n,
           );
           return { connections, nudges };
-        }),
+        });
+        // Multi-table invariant (contact_log insert + next_nudge advance) — RPC, see repository.ts.
+        if (activeOwnerId) repository.logOutreachRemote(connectionId, via);
+      },
 
       respondToNudge: (nudgeId, response) => {
         const nudge = get().nudges.find((n) => n.id === nudgeId);
         if (response === 'reached_out' && nudge) {
-          // Logging outreach also resolves the nudge.
+          // Logging outreach resolves every open nudge on this connection
+          // locally (see logOutreach) — mirror that resolution remotely too,
+          // not just this one nudge, so a fresh load doesn't resurrect them.
+          const resolvedIds = get()
+            .nudges.filter((n) => n.connectionId === nudge.connectionId && n.response === null)
+            .map((n) => n.id);
           get().logOutreach(nudge.connectionId, 'imessage');
+          if (activeOwnerId) {
+            for (const id of resolvedIds) repository.respondToNudgeRemote(id, 'reached_out');
+          }
           return;
         }
         set((s) => ({
@@ -263,6 +285,7 @@ export const useStore = create<AppState>()(
             n.id === nudgeId ? { ...n, response, due: false } : n,
           ),
         }));
+        if (activeOwnerId && response) repository.respondToNudgeRemote(nudgeId, response);
       },
 
       setCadence: (connectionId, cadence) =>
@@ -478,50 +501,78 @@ export const useStore = create<AppState>()(
 
 /**
  * Supabase sync layer — entirely additive, no store action above is aware of
- * it. When `isSupabaseConfigured` is false (no project/keys set, e.g. local
- * dev or CI) this is a no-op and the app runs exactly as it did before: mock
- * seed + AsyncStorage persistence only (see src/data/repository.ts).
+ * it except the two RPC call-sites in `logOutreach`/`respondToNudge` above.
+ * Unlike the old single-tenant design this is gated on a real authenticated
+ * user, not just `isSupabaseConfigured`: RLS (see supabase/migrations) keys
+ * every table off `auth.uid()`, so there's nothing valid to sync before
+ * sign-in. `app/_layout.tsx` calls `startSupabaseSync(userId)` once
+ * `useAuthStore` reports `signedIn`, and `stopSupabaseSync()` on sign-out.
+ * When `isSupabaseConfigured` is false (no project/keys set, e.g. local dev
+ * or CI), or while signed out, this never runs — the app is mock seed +
+ * AsyncStorage persistence only, exactly as before auth/Supabase existed.
  *
- * On load, remote state (once fetched) overwrites the local/mock state that
- * rendered first; on every subsequent change, the affected slice is pushed to
- * Supabase in the background.
+ * On start, remote state (once fetched) overwrites the local/mock state that
+ * rendered first. After that, `connections`/`nudges`/`pendingConnections`
+ * are read-hydrated only — they can't be manufactured from local/mock state
+ * (see src/data/repository.ts module docs) — while `profiles` stays a full
+ * push-on-change mirror, and per-connection edits (cadence/type/archived) or
+ * new/cancelled invites push their specific change directly.
  */
-if (isSupabaseConfigured) {
+let activeOwnerId: string | null = null;
+let syncUnsubscribe: (() => void) | null = null;
+
+export function startSupabaseSync(ownerId: string) {
+  if (!isSupabaseConfigured || activeOwnerId === ownerId) return;
+  stopSupabaseSync();
+  activeOwnerId = ownerId;
+
   const initial = useStore.getState();
   repository
-    .loadOrSeedRemoteState({
-      onboarded: initial.onboarded,
-      user: initial.user,
-      connections: initial.connections,
-      nudges: initial.nudges,
-      outgoingRequests: initial.outgoingRequests,
-      incomingRequests: initial.incomingRequests,
-      pendingConnections: initial.pendingConnections,
-      settings: initial.settings,
-    })
+    .loadOrSeedRemoteState(
+      {
+        user: initial.user,
+        settings: initial.settings,
+        connections: initial.connections,
+        nudges: initial.nudges,
+        pendingConnections: initial.pendingConnections,
+        onboarded: initial.onboarded,
+      },
+      ownerId,
+    )
     .then((remote) => {
-      if (remote) useStore.setState(remote);
+      if (activeOwnerId !== ownerId || !remote) return;
+      useStore.setState({
+        user: { ...remote.user, profileCompletion: computeCompletion(remote.user) },
+        settings: remote.settings,
+        connections: remote.connections,
+        nudges: remote.nudges,
+        pendingConnections: remote.pendingConnections,
+        onboarded: remote.onboarded ?? initial.onboarded,
+      });
     })
     .catch((error) => console.warn('[supabase] initial hydrate failed, staying on local data', error));
 
-  useStore.subscribe((state, prev) => {
-    const ownerId = state.user.id;
-    if (state.user !== prev.user || state.onboarded !== prev.onboarded || state.settings !== prev.settings) {
-      repository.saveUserRow(state.user, state.onboarded, state.settings);
+  syncUnsubscribe = useStore.subscribe((state, prev) => {
+    if (activeOwnerId !== ownerId) return;
+    if (state.user !== prev.user || state.settings !== prev.settings) {
+      repository.saveProfile(state.user, state.settings);
     }
     if (state.connections !== prev.connections) {
-      repository.saveConnections(ownerId, state.connections);
-    }
-    if (state.nudges !== prev.nudges) {
-      repository.saveNudges(ownerId, state.nudges);
+      for (const c of state.connections) repository.updateConnectionMember(ownerId, c);
     }
     if (state.pendingConnections !== prev.pendingConnections) {
-      repository.savePendingConnections(ownerId, state.pendingConnections);
-    }
-    if (state.outgoingRequests !== prev.outgoingRequests || state.incomingRequests !== prev.incomingRequests) {
-      repository.saveRequests(ownerId, state.outgoingRequests, state.incomingRequests);
+      const added = state.pendingConnections.filter((p) => !prev.pendingConnections.some((pp) => pp.id === p.id));
+      const removed = prev.pendingConnections.filter((p) => !state.pendingConnections.some((cp) => cp.id === p.id));
+      for (const p of added) repository.createPendingInviteRemote(ownerId, p);
+      for (const p of removed) repository.deletePendingInviteRemote(p.id);
     }
   });
+}
+
+export function stopSupabaseSync() {
+  syncUnsubscribe?.();
+  syncUnsubscribe = null;
+  activeOwnerId = null;
 }
 
 /** Stable helper used across screens: is a connection's next nudge due today? */

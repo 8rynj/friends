@@ -80,7 +80,10 @@ src/
   hooks/                  useReducedMotion
   nfc/                    tapConnect.ts — react-native-nfc-manager wrapper (native-only)
 supabase/
-  schema.sql              users, connections, nudges, pending_connections, requests tables + RLS
+  migrations/             0001_baseline.sql, 0002_extend.sql — real multi-user
+                          schema (profiles, connections, connection_members,
+                          contact_log, handles, nudges, pending_connections,
+                          requests) with auth.uid()-scoped RLS + RPCs
 server/
   sendPush.ts             Backend push-send function (Expo Push API) — not yet wired to a live backend
 ```
@@ -124,46 +127,63 @@ server/
   pure white (cream/off-white), yellow is accent-only, flat color blocks (no
   gradients). Keep decoration off readable text and off navigation.
 
-## Supabase (optional backend)
+## Supabase (real multi-user backend)
 
-The Zustand store (`src/store/useStore.ts`) can be backed by Supabase without
-any screen or action changing, and passwordless phone auth (Auth → Providers →
-Phone + Twilio) can gate the app once that data layer exists. Both are
-entirely additive and opt-in via the same two env vars — with neither set,
-the app behaves exactly as before (mock seed + AsyncStorage only, zero
-network calls, no sign-in screen).
+The Zustand store (`src/store/useStore.ts`) is backed by a real, normalized,
+multi-user Supabase schema — passwordless phone auth (Auth → Providers →
+Phone + Twilio) gates the app, and every table is scoped to `auth.uid()` via
+RLS, not a fixed dev user. It's still opt-in via the same two env vars — with
+neither set, the app behaves exactly as it always has (mock seed + AsyncStorage
+only, zero network calls, no sign-in screen) — but once configured, it's live,
+not a demo.
 
 **Setup:**
 
 1. Create a project at supabase.com (or use an existing one).
-2. In the SQL editor, run `supabase/schema.sql` — creates `users`,
-   `connections`, `nudges`, `pending_connections`, `requests`, with RLS enabled
-   and permissive dev policies (see the file's RLS comment — there's no
-   owner-scoping yet since sync is single-tenant; tighten before shipping
-   with real multi-user accounts).
+2. In the SQL editor, run `supabase/migrations/0001_baseline.sql` then
+   `supabase/migrations/0002_extend.sql`, in order. Both are idempotent
+   (`create table if not exists`, `create or replace function`, drop-then-create
+   for policies) — safe to re-run.
 3. Copy `.env.example` to `.env.local` and fill in `EXPO_PUBLIC_SUPABASE_URL` /
    `EXPO_PUBLIC_SUPABASE_ANON_KEY` from the project's Settings → API page.
-4. To also enable phone sign-in, turn on Auth → Providers → Phone and set
-   Twilio as the SMS provider — same two env vars, no extra config.
+4. Turn on Auth → Providers → Phone and set Twilio as the SMS provider — phone
+   sign-in is required for sync (RLS has no anonymous access path).
 5. Restart Metro (`npx expo start -c` to clear the env cache).
+
+**Schema (`supabase/migrations/`):** `profiles` (`id = auth.uid()`, one row per
+user — `handle_new_user()` auto-creates a stub on signup), `connections` (one
+canonical row per pair, `user_a < user_b`), `connection_members` (the per-side
+view — type/cadence/sharing/archive/outreach state, since two people can see
+the same connection differently), `contact_log`, `handles`, `nudges`,
+`pending_connections` (SMS-invite tokens), `requests` (Search send/accept
+handshake). Multi-table invariants go through `security definer` RPCs rather
+than raw client writes: `confirm_connection` (create/find a connection, seed
+its nudge sequence), `log_outreach` (log contact + advance `next_nudge` from
+cadence), `accept_request`, `search_profiles`.
 
 **How it works:**
 
 - `src/lib/supabase.ts` builds the client from the env vars; `isSupabaseConfigured`
-  is false (client is `null`) when either is missing. Everything below — data
-  sync and the auth gate — keys off this single flag.
+  is false (client is `null`) when either is missing.
 - `src/data/repository.ts` maps between the store's TypeScript shapes and the
-  Supabase row shapes (a connection's embedded `user` profile is stored as a
-  `profile` jsonb column, not normalized — sync is single-tenant, so
-  connections aren't necessarily linked to another `users` row).
-- `useStore.ts` calls the repository in exactly two places, both additive:
-  once at module load to hydrate remote state over the local/mock state (and
-  to seed a fresh project from the mock data if it's empty), and once via
-  `useStore.subscribe` to push each changed slice (user, connections, nudges,
-  pending connections, requests) to Supabase in the background after every
-  action. No store action was rewritten — this is why screens are unaffected.
-- Sync is single-user / single-tenant (owner id is always the seeded `me`
-  user's id) until real multi-user auth + owner-scoped RLS lands.
+  normalized row shapes — joining `connection_members` + `connections` +
+  `profiles` + `contact_log` to reconstruct a `Connection`, since the other
+  person's profile is a real linked row now, not an embedded snapshot.
+- **Sync is gated on a real signed-in session, not just `isSupabaseConfigured`**
+  — every RLS policy keys off `auth.uid()`, so there's nothing valid to read/write
+  before sign-in. `app/_layout.tsx` calls `useStore.ts`'s `startSupabaseSync(userId)`
+  once `useAuthStore` reports `signedIn` (and sets the store's `user.id` to that
+  same `auth.uid()`, since `profiles.id` must match it), and `stopSupabaseSync()`
+  on sign-out — see `settings.tsx`'s `signOut`, which stops sync *before* resetting
+  local state so the mock-seed reset never reads as real deletes.
+- `connections`/`nudges`/`pendingConnections` are **read-hydrated, not pushed
+  wholesale**: they can only be populated by a real counterpart going through
+  `confirm_connection`, so the repository never manufactures them from local/mock
+  state. Per-action edits push their specific change instead (cadence/type/archived
+  → `connection_members` update; `logOutreach` → the RPC; `respondToNudge` →
+  `nudges` update; new/cancelled invites → `pending_connections` insert/delete).
+  `profiles` (this user's own row) is the exception and stays a full push-on-change
+  mirror, upserted on first load if missing.
 - **Auth gate (`app/_layout.tsx` + `src/store/useAuthStore.ts`):** when
   `isSupabaseConfigured` is true, `useAuthStore` subscribes to
   `supabase.auth.onAuthStateChange` and the root layout redirects every route
@@ -173,6 +193,12 @@ network calls, no sign-in screen).
   Supabase isn't configured, `useAuthStore.status` resolves straight to
   `'unconfigured'` and the gate is skipped entirely — the app runs exactly as
   it did before phone auth existed.
+- **NFC bump, Search send/accept, and SMS-invite claim are not wired to the
+  real backend yet** — they still resolve against the local mock candidate
+  pool (`src/data/mock.ts`), even when signed in. The schema and RPCs
+  (`confirm_connection`, `accept_request`, the `requests` table) are ready for
+  this, but wiring it in means a real directory to search/tap against, which
+  needs a second real account to build against and verify — see "Not built yet".
 
 ## Gotchas (learned the hard way)
 
@@ -229,6 +255,11 @@ but not wired to a live backend — no EAS project id (so `registerForPushTokenA
 fails closed), no server calling `sendPush.ts` yet.
 
 A Supabase-backed data layer and passwordless phone auth both exist (see
-above) but are single-tenant / keyed to a fixed dev user — multi-user support
-needs Supabase Auth-driven, owner-scoped RLS policies (today's policies are
-permissive dev defaults, not per-user).
+above) with real multi-user, `auth.uid()`-scoped RLS — but connection
+*creation* (NFC bump, Search send/accept, SMS-invite claim) still resolves
+against the local mock candidate pool rather than a real directory of other
+signed-up users, so until a second real account exists to connect with,
+`connections`/`nudges` will read back empty for a fresh sign-in. Wiring those
+flows to `confirm_connection`/`accept_request`/the `requests` table (schema
+and RPCs are ready) is the next step, along with a real invite-claim flow
+using `pending_connections.token` (currently only the inviter side syncs).

@@ -38,7 +38,7 @@ import {
 } from '@expo-google-fonts/space-grotesk';
 import { colors } from '../src/theme';
 import { ErrorBoundary } from '../src/components';
-import { useStore } from '../src/store/useStore';
+import { startSupabaseSync, stopSupabaseSync, useStore } from '../src/store/useStore';
 import { useNudgeReminders } from '../src/hooks/useNudgeReminders';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { registerForPushTokenAsync, useNotificationDeepLinks } from '../src/notifications';
@@ -62,13 +62,27 @@ export default function RootLayout() {
   const initAuth = useAuthStore((s) => s.init);
   const authStatus = useAuthStore((s) => s.status);
   const authPhone = useAuthStore((s) => s.phone);
+  const authUserId = useAuthStore((s) => s.userId);
   useEffect(() => initAuth(), [initAuth]);
 
-  // Once signed in, the verified phone becomes part of the user's own profile
-  // (used to match/tag claimed connections — see claim/[id].tsx).
+  // Once signed in, the verified phone + auth.uid() become part of the
+  // user's own profile — the id match matters because every Supabase table's
+  // RLS is keyed off auth.uid() (see supabase/migrations), so the store's
+  // `user.id` has to line up with it for sync to see this user's own rows.
   useEffect(() => {
-    if (authPhone) completeProfile({ phone: authPhone });
-  }, [authPhone, completeProfile]);
+    if (authUserId) completeProfile({ phone: authPhone ?? undefined, id: authUserId });
+  }, [authUserId, authPhone, completeProfile]);
+
+  // Sync starts only once we have both a hydrated local store and a real
+  // signed-in user's id — see useStore.ts's startSupabaseSync docs.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (authStatus === 'signedIn' && authUserId) {
+      startSupabaseSync(authUserId);
+    } else if (authStatus === 'signedOut') {
+      stopSupabaseSync();
+    }
+  }, [hasHydrated, authStatus, authUserId]);
 
   // Keep local nudge reminders in sync with store state (native-only).
   useNudgeReminders();
