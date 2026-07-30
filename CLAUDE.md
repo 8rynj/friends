@@ -245,8 +245,8 @@ the end of this section.)
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
 `react-native-nfc-manager` — but the id it reads is still resolved against the
-local `newCandidates` mock pool rather than a backend directory, since there's
-no multi-user backend yet.
+local `newCandidates` mock pool rather than a real signed-up user, since NFC
+bump isn't wired to the backend directory yet (see "Supabase" above).
 
 Local nudge reminders ARE wired (`src/engine/notifications.ts` +
 `src/hooks/useNudgeReminders.ts`): expo-notifications schedules an on-device
