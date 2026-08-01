@@ -18,11 +18,12 @@
  * change and upserted on first load, same as before, since RLS lets a user
  * freely write their own row.
  *
- * NFC bump, Search (send/accept a request), and SMS-invite claim still
- * resolve against the local mock candidate pool (src/data/mock.ts) rather
- * than calling `confirm_connection`/the `requests` table/`claim`, since
- * there's no real directory of other signed-up users to connect with yet —
- * see CLAUDE.md "Not built yet".
+ * NFC bump, Search (send/accept a request), and SMS-invite claim resolve
+ * against the real directory via `search_profiles`/`get_profile_preview`,
+ * the `requests` table + `accept_request`, and `pending_connections.token` +
+ * `claim_pending_connection` (see supabase/migrations/0003_connect_creation.sql)
+ * whenever a real backend is signed in — `src/store/useStore.ts` falls back
+ * to the local mock candidate pool (`src/data/mock.ts`) only when it isn't.
  */
 import { supabase } from '../lib/supabase';
 import type { Settings } from '../store/useStore';
@@ -31,9 +32,11 @@ import {
   Connection,
   ContactLogEntry,
   Handle,
+  IncomingRequest,
   MetContext,
   Nudge,
   NudgeCadence,
+  OutgoingRequest,
   PendingConnection,
   PulledData,
   User,
@@ -46,6 +49,8 @@ export interface SyncableState {
   connections: Connection[];
   nudges: Nudge[];
   pendingConnections: PendingConnection[];
+  incomingRequests: IncomingRequest[];
+  outgoingRequests: OutgoingRequest[];
   /** Only meaningful on first load: false when the remote profile looks unfilled. */
   onboarded?: boolean;
 }
@@ -182,14 +187,17 @@ interface ContactLogRow {
   created_at: string;
 }
 
-/** Reads this user's connections (real ones only — see module docs). */
-export async function loadConnections(ownerId: string): Promise<Connection[]> {
+/**
+ * Reads this user's connections (real ones only — see module docs). Pass
+ * `onlyConnectionId` to scope the query to a single just-created connection
+ * (NFC bump / accept request / SMS claim) instead of refetching everything.
+ */
+export async function loadConnections(ownerId: string, onlyConnectionId?: string): Promise<Connection[]> {
   if (!supabase) return [];
   try {
-    const { data: members, error: membersError } = await supabase
-      .from('connection_members')
-      .select('*')
-      .eq('user_id', ownerId);
+    let query = supabase.from('connection_members').select('*').eq('user_id', ownerId);
+    if (onlyConnectionId) query = query.eq('connection_id', onlyConnectionId);
+    const { data: members, error: membersError } = await query;
     if (membersError) throw membersError;
     const memberRows = (members ?? []) as MemberRow[];
     if (memberRows.length === 0) return [];
@@ -338,10 +346,7 @@ interface PendingRow {
   expires_at: string;
   created_at: string;
   met_context: MetContext | null;
-}
-
-function genToken(): string {
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  token: string;
 }
 
 export async function loadPendingConnections(ownerId: string): Promise<PendingConnection[]> {
@@ -349,7 +354,7 @@ export async function loadPendingConnections(ownerId: string): Promise<PendingCo
   try {
     const { data, error } = await supabase
       .from('pending_connections')
-      .select('id, invitee_phone, name, expires_at, created_at, met_context')
+      .select('id, invitee_phone, name, expires_at, created_at, met_context, token')
       .eq('inviter_id', ownerId)
       .is('claimed_by', null);
     if (error) throw error;
@@ -361,6 +366,7 @@ export async function loadPendingConnections(ownerId: string): Promise<PendingCo
       expiresAt: row.expires_at.slice(0, 10),
       method: 'sms',
       metContext: row.met_context ?? undefined,
+      token: row.token,
     }));
   } catch (error) {
     logSyncError('loadPendingConnections', error);
@@ -368,15 +374,16 @@ export async function loadPendingConnections(ownerId: string): Promise<PendingCo
   }
 }
 
+/** `pending.token` is generated client-side (useStore's `createPendingInvite`) so the same value is usable as the shareable claim link before this push resolves. */
 export async function createPendingInviteRemote(ownerId: string, pending: PendingConnection) {
-  if (!supabase) return;
+  if (!supabase || !pending.token) return;
   try {
     const { error } = await supabase.from('pending_connections').insert({
       id: pending.id,
       inviter_id: ownerId,
       invitee_phone: pending.phone,
       name: pending.name ?? null,
-      token: genToken(),
+      token: pending.token,
       expires_at: pending.expiresAt,
       met_context: pending.metContext ?? null,
     });
@@ -393,6 +400,254 @@ export async function deletePendingInviteRemote(pendingId: string) {
     if (error) logSyncError('pending_connections delete', error);
   } catch (error) {
     logSyncError('pending_connections delete', error);
+  }
+}
+
+/** Public preview of an invite by claim-link token — reachable while signed out (Spec §5C). Null when the token doesn't exist. */
+export async function previewPendingByToken(token: string): Promise<{
+  inviterId: string;
+  inviterName: string;
+  inviterAvatarColor?: string;
+  inviterPhoto?: string;
+  inviterTopHobbies: string[];
+  inviterHobbies: string[];
+  inviteeName?: string;
+  expiresAt: string;
+  claimed: boolean;
+} | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.rpc('preview_pending_connection', { p_token: token }).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as {
+      inviter_id: string; inviter_name: string; inviter_avatar_bg: string | null;
+      inviter_photo_url: string | null; inviter_top_hobbies: string[]; inviter_hobbies: string[];
+      invitee_name: string | null; expires_at: string; claimed: boolean;
+    };
+    return {
+      inviterId: row.inviter_id,
+      inviterName: row.inviter_name,
+      inviterAvatarColor: row.inviter_avatar_bg ?? undefined,
+      inviterPhoto: row.inviter_photo_url ?? undefined,
+      inviterTopHobbies: row.inviter_top_hobbies ?? [],
+      inviterHobbies: row.inviter_hobbies ?? [],
+      inviteeName: row.invitee_name ?? undefined,
+      expiresAt: row.expires_at,
+      claimed: row.claimed,
+    };
+  } catch (error) {
+    logSyncError('preview_pending_connection', error);
+    return null;
+  }
+}
+
+/** Claims a pending invite by token → a real connection. Throws on failure (already claimed/expired/etc.) so the caller can surface why. */
+export async function claimPendingRemote(token: string, myShares: string[] = []): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.rpc('claim_pending_connection', { p_token: token, my_shares: myShares });
+  if (error) throw error;
+  return data as string;
+}
+
+// --- directory search + profile previews (NFC bump, Search — Spec §5B) ----
+
+export interface DirectoryResult {
+  id: string;
+  name: string;
+  avatarColor?: string;
+  photo?: string;
+}
+
+export interface ProfilePreview extends DirectoryResult {
+  topHobbies: string[];
+  hobbies: string[];
+}
+
+/** Searches discoverable (`profiles.searchable`) users by name (Spec §5B Method 3). */
+export async function searchProfilesRemote(query: string): Promise<DirectoryResult[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc('search_profiles', { q: query });
+    if (error) throw error;
+    return (data as { id: string; name: string; avatar_bg: string | null; photo_url: string | null }[]).map((r) => ({
+      id: r.id,
+      name: r.name,
+      avatarColor: r.avatar_bg ?? undefined,
+      photo: r.photo_url ?? undefined,
+    }));
+  } catch (error) {
+    logSyncError('search_profiles', error);
+    return [];
+  }
+}
+
+/** Looks up an arbitrary profile by id (NFC bump) — bypasses the normal "self or already-connected" profiles RLS via a security-definer RPC. Null when the id isn't a real profile. */
+export async function getProfilePreview(id: string): Promise<ProfilePreview | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_profile_preview', { p_id: id }).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as { id: string; name: string; avatar_bg: string | null; photo_url: string | null; top_hobbies: string[]; hobbies: string[] };
+    return {
+      id: row.id,
+      name: row.name,
+      avatarColor: row.avatar_bg ?? undefined,
+      photo: row.photo_url ?? undefined,
+      topHobbies: row.top_hobbies ?? [],
+      hobbies: row.hobbies ?? [],
+    };
+  } catch (error) {
+    logSyncError('get_profile_preview', error);
+    return null;
+  }
+}
+
+/** Creates a connection directly (NFC bump — consent is already established by the physical tap, Spec §5B Method 1). Throws on failure. */
+export async function confirmConnectionRemote(otherId: string, method: 'nfc' | 'search' = 'nfc', metContext?: MetContext): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.rpc('confirm_connection', {
+    other: otherId,
+    my_shares: [],
+    p_method: method,
+    p_met_context: metContext ?? null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+// --- requests (Search send/accept — Spec §5B Method 3) ---------------------
+
+interface RequestRow {
+  id: string;
+  owner_id: string;
+  target_id: string;
+  note: string | null;
+  attempts: number;
+  status: 'pending' | 'ignored' | 'blocked' | 'accepted';
+}
+
+export type SendRequestOutcome = 'pending' | 'blocked' | 'already';
+
+/** Sends (or re-sends) a connect request. Upserts on the (owner_id, target_id) unique pair so a resend after an ignore bumps `attempts` instead of erroring. Throws on failure. */
+export async function sendConnectRequestRemote(
+  ownerId: string,
+  targetId: string,
+  note: string | undefined,
+  met: MetContext | undefined,
+): Promise<SendRequestOutcome> {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data: existing, error: readError } = await supabase
+    .from('requests')
+    .select('id, attempts, status')
+    .eq('owner_id', ownerId)
+    .eq('target_id', targetId)
+    .maybeSingle();
+  if (readError) throw readError;
+  const row = existing as Pick<RequestRow, 'id' | 'attempts' | 'status'> | null;
+  if (row?.status === 'blocked') return 'blocked';
+  if (row?.status === 'accepted') return 'already';
+
+  const attempts = row?.status === 'ignored' ? row.attempts + 1 : row?.attempts ?? 1;
+  const status: 'pending' | 'blocked' = attempts >= 3 && row?.status === 'ignored' ? 'blocked' : 'pending';
+
+  const { error: writeError } = await supabase.from('requests').upsert(
+    {
+      id: row?.id,
+      owner_id: ownerId,
+      target_id: targetId,
+      note: note ?? null,
+      met_context: met ?? null,
+      attempts,
+      status,
+    },
+    { onConflict: 'owner_id,target_id' },
+  );
+  if (writeError) throw writeError;
+  return status;
+}
+
+/** This user's outgoing requests, for the Find screen's per-person status label. */
+export async function loadOutgoingRequests(ownerId: string): Promise<OutgoingRequest[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id, target_id, note, attempts, status')
+      .eq('owner_id', ownerId);
+    if (error) throw error;
+    return (data as Pick<RequestRow, 'id' | 'target_id' | 'note' | 'attempts' | 'status'>[]).map((r) => ({
+      id: r.id,
+      personId: r.target_id,
+      note: r.note ?? undefined,
+      attempts: r.attempts,
+      status: r.status,
+    }));
+  } catch (error) {
+    logSyncError('loadOutgoingRequests', error);
+    return [];
+  }
+}
+
+/** This user's incoming requests, joined with the sender's preview (Home's "wants to connect" card). */
+export async function loadIncomingRequests(): Promise<{ id: string; note?: string; connection: Connection }[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc('list_incoming_requests');
+    if (error) throw error;
+    return (data as { id: string; owner_id: string; name: string; avatar_bg: string | null; photo_url: string | null; note: string | null; met_context: MetContext | null }[]).map((r) => ({
+      id: r.id,
+      note: r.note ?? undefined,
+      connection: {
+        id: r.owner_id,
+        user: {
+          id: r.owner_id,
+          name: r.name,
+          avatarColor: r.avatar_bg ?? undefined,
+          photo: r.photo_url ?? undefined,
+          interests: [],
+          hobbies: [],
+          topHobbies: [],
+          bucketList: [],
+          certifications: [],
+          travel: [],
+          lifeExperiences: [],
+          handles: [],
+          profileCompletion: 0,
+        },
+        method: 'search',
+        connectionType: 'friend',
+        metContext: r.met_context ?? undefined,
+        sharedContactInfo: [],
+        nudgeCadence: 'monthly',
+        lastContacted: null,
+        nextNudge: null,
+        contactHistory: [],
+      },
+    }));
+  } catch (error) {
+    logSyncError('loadIncomingRequests', error);
+    return [];
+  }
+}
+
+/** Accepts an incoming request → a real connection. Throws on failure. */
+export async function acceptRequestRemote(requestId: string): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.rpc('accept_request', { p_request: requestId, my_shares: [] });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Ignores an incoming request (target-side status update — allowed by the `requests_update` RLS policy). */
+export async function ignoreRequestRemote(requestId: string) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('requests').update({ status: 'ignored' }).eq('id', requestId);
+    if (error) logSyncError('requests ignore', error);
+  } catch (error) {
+    logSyncError('requests ignore', error);
   }
 }
 
@@ -432,12 +687,14 @@ export async function loadOrSeedRemoteState(local: SyncableState, ownerId: strin
     }
 
     const connections = await loadConnections(ownerId);
-    const [nudges, pendingConnections] = await Promise.all([
+    const [nudges, pendingConnections, incomingRequests, outgoingRequests] = await Promise.all([
       loadNudges(ownerId, connections),
       loadPendingConnections(ownerId),
+      loadIncomingRequests(),
+      loadOutgoingRequests(ownerId),
     ]);
 
-    return { user, settings, connections, nudges, pendingConnections, onboarded };
+    return { user, settings, connections, nudges, pendingConnections, incomingRequests, outgoingRequests, onboarded };
   } catch (error) {
     logSyncError('loadOrSeedRemoteState', error);
     return null;

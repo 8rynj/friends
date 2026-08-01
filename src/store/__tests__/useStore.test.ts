@@ -153,40 +153,40 @@ describe('connectDataPull', () => {
 });
 
 describe('sendConnectRequest', () => {
-  it('rejects an already-connected person', () => {
-    expect(useStore.getState().sendConnectRequest('sarah')).toEqual({ outcome: 'already' });
+  it('rejects an already-connected person', async () => {
+    expect(await useStore.getState().sendConnectRequest('sarah')).toEqual({ outcome: 'already' });
   });
 
-  it('rejects an unknown person', () => {
-    expect(useStore.getState().sendConnectRequest('ghost')).toEqual({ outcome: 'notfound' });
+  it('rejects an unknown person', async () => {
+    expect(await useStore.getState().sendConnectRequest('ghost')).toEqual({ outcome: 'notfound' });
   });
 
-  it('accepts a discoverable person and adds the connection', () => {
-    const res = useStore.getState().sendConnectRequest('maya', 'hi');
+  it('accepts a discoverable person and adds the connection', async () => {
+    const res = await useStore.getState().sendConnectRequest('maya', 'hi');
     expect(res).toEqual({ outcome: 'accepted', connectionId: 'maya' });
     expect(useStore.getState().isConnected('maya')).toBe(true);
   });
 
-  it('ignores three times, then blocks indefinitely', () => {
+  it('ignores three times, then blocks indefinitely', async () => {
     const send = () => useStore.getState().sendConnectRequest('liam');
-    expect(send().outcome).toBe('ignored');
-    expect(send().outcome).toBe('ignored');
-    expect(send().outcome).toBe('blocked');
+    expect((await send()).outcome).toBe('ignored');
+    expect((await send()).outcome).toBe('ignored');
+    expect((await send()).outcome).toBe('blocked');
     // Once blocked, further attempts stay blocked.
-    expect(send().outcome).toBe('blocked');
+    expect((await send()).outcome).toBe('blocked');
   });
 });
 
 describe('incoming requests', () => {
-  it('accepting turns a request into a connection', () => {
-    const id = useStore.getState().acceptIncoming('req-jess');
+  it('accepting turns a request into a connection', async () => {
+    const id = await useStore.getState().acceptIncoming('req-jess');
     expect(id).toBe('jess');
     expect(useStore.getState().isConnected('jess')).toBe(true);
     expect(useStore.getState().incomingRequests.find((r) => r.id === 'req-jess')).toBeUndefined();
   });
 
-  it('ignoring drops the request without connecting', () => {
-    useStore.getState().ignoreIncoming('req-jess');
+  it('ignoring drops the request without connecting', async () => {
+    await useStore.getState().ignoreIncoming('req-jess');
     expect(useStore.getState().incomingRequests).toHaveLength(0);
     expect(useStore.getState().isConnected('jess')).toBe(false);
   });
@@ -195,7 +195,9 @@ describe('incoming requests', () => {
 describe('pending SMS invites', () => {
   it('creates, claims, and produces a connection', () => {
     const id = useStore.getState().createPendingInvite('Alex', '+15551234567');
-    expect(useStore.getState().pendingConnections.find((p) => p.id === id)).toBeDefined();
+    const created = useStore.getState().pendingConnections.find((p) => p.id === id);
+    expect(created).toBeDefined();
+    expect(created?.token).toBeTruthy();
     const connId = useStore.getState().claimPending(id);
     expect(connId).toBe(`claimed-${id}`);
     expect(useStore.getState().isConnected(connId!)).toBe(true);
@@ -206,6 +208,39 @@ describe('pending SMS invites', () => {
     const id = useStore.getState().createPendingInvite('Alex', '+15551234567');
     useStore.getState().cancelPending(id);
     expect(useStore.getState().pendingConnections.find((p) => p.id === id)).toBeUndefined();
+  });
+});
+
+describe('searchDirectory (mock pool)', () => {
+  it('filters by name and excludes already-connected people', async () => {
+    const results = await useStore.getState().searchDirectory('maya');
+    expect(results.map((r) => r.id)).toEqual(['maya']);
+  });
+
+  it('excludes people already connected', async () => {
+    const results = await useStore.getState().searchDirectory('sarah');
+    expect(results).toHaveLength(0);
+  });
+});
+
+describe('NFC bump (mock pool)', () => {
+  it('previews a candidate from the bump pool', async () => {
+    const preview = await useStore.getState().previewCandidate('theo');
+    expect(preview?.name).toBe('Theo Martins');
+  });
+
+  it('returns null for an id outside the bump pool', async () => {
+    expect(await useStore.getState().previewCandidate('ghost')).toBeNull();
+  });
+
+  it('confirming a preview adds the full connection', async () => {
+    const preview = await useStore.getState().previewCandidate('theo');
+    const id = await useStore.getState().confirmNfcConnection(preview!);
+    expect(id).toBe('theo');
+    expect(useStore.getState().isConnected('theo')).toBe(true);
+    // Full mock profile (handles/pulled data), not just the preview subset.
+    const theo = useStore.getState().connections.find((c) => c.id === 'theo')!;
+    expect(theo.user.handles.length).toBeGreaterThan(0);
   });
 });
 

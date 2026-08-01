@@ -163,7 +163,7 @@ export default function InviteScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 12 }}>
                   <Pressable
-                    onPress={() => router.push(`/claim/${p.id}`)}
+                    onPress={() => router.push(`/claim/${p.token ?? p.id}`)}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
                     accessibilityLabel={`Preview claim link for ${p.name ?? p.phone}`}

@@ -5,6 +5,11 @@
  * Bump drives a real NFC scan (src/nfc/tapConnect.ts): tap a tag, confirm
  * the person it identifies, then connect. Needs a dev-client/prebuilt
  * native build — it's a no-op in Expo Go and on web (see CLAUDE.md).
+ *
+ * `previewCandidate`/`confirmNfcConnection` (src/store/useStore.ts) resolve
+ * the tag's id against the real directory (`get_profile_preview` +
+ * `confirm_connection`) when signed into a real Supabase backend, and fall
+ * back to the local `newCandidates` mock pool otherwise.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
@@ -13,9 +18,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Avatar, Button, CollageCard, OutlineText, Pill } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
-import { newCandidates } from '../src/data/mock';
-import { Connection } from '../src/data/types';
-import { useStore } from '../src/store/useStore';
+import { CandidatePreview, useStore } from '../src/store/useStore';
 import { cancelScan, isNfcAvailable, isScanCancelled, scanForConnectId } from '../src/nfc/tapConnect';
 
 type BumpStatus = 'idle' | 'scanning' | 'confirm' | 'unsupported' | 'error';
@@ -24,14 +27,13 @@ export default function AddScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const connections = useStore((s) => s.connections);
-  const addConnection = useStore((s) => s.addConnection);
-  const setCadence = useStore((s) => s.setCadence);
+  const previewCandidate = useStore((s) => s.previewCandidate);
+  const confirmNfcConnection = useStore((s) => s.confirmNfcConnection);
   const pending = useStore((s) => s.pendingConnections);
   const nfcEnabled = useStore((s) => s.settings.nfcEnabled);
-  const defaultCadence = useStore((s) => s.settings.defaultCadence);
 
   const [status, setStatus] = useState<BumpStatus>('idle');
-  const [found, setFound] = useState<Connection | null>(null);
+  const [found, setFound] = useState<CandidatePreview | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Abort a scan in flight if the user navigates away mid-tap.
@@ -46,14 +48,14 @@ export default function AddScreen() {
         return;
       }
       const candidateId = await scanForConnectId();
-      const candidate = candidateId ? newCandidates.find((c) => c.id === candidateId) : undefined;
+      const candidate = candidateId ? await previewCandidate(candidateId) : null;
       if (!candidate) {
         setErrorMessage("That tag isn't a Knowable profile.");
         setStatus('error');
         return;
       }
       if (connections.some((c) => c.id === candidate.id)) {
-        setErrorMessage(`You're already connected with ${candidate.user.name.split(' ')[0]}.`);
+        setErrorMessage(`You're already connected with ${candidate.name.split(' ')[0]}.`);
         setStatus('error');
         return;
       }
@@ -71,15 +73,18 @@ export default function AddScreen() {
 
   // Mutual confirmation: the scan only identifies who's there — connecting
   // still requires an explicit confirm before it lands in the store.
-  const confirmConnect = () => {
+  const confirmConnect = async () => {
     if (!found) return;
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    addConnection(found);
-    setCadence(found.id, defaultCadence);
-    const id = found.id;
+    const id = await confirmNfcConnection(found);
     setStatus('idle');
     setFound(null);
-    router.replace(`/icebreaker?id=${id}`);
+    if (id) {
+      router.replace(`/icebreaker?id=${id}`);
+    } else {
+      setErrorMessage("Couldn't connect right now — give it another try.");
+      setStatus('error');
+    }
   };
 
   const dismiss = () => {
@@ -199,9 +204,9 @@ export default function AddScreen() {
 
           {status === 'confirm' && found && (
             <CollageCard background={palette.cream} rotate="0.5deg" taped style={{ alignItems: 'center', paddingVertical: 26 }}>
-              <Avatar name={found.user.name} color={found.user.avatarColor} size={64} shadowed />
+              <Avatar name={found.name} color={found.avatarColor} size={64} shadowed />
               <Text style={[type.cardTitle, { color: colors.nearBlack, marginTop: 12, textAlign: 'center' }]}>
-                Connect with {found.user.name}?
+                Connect with {found.name}?
               </Text>
               <Text style={[type.body, { color: colors.textMutedOnLight, marginTop: 4, textAlign: 'center' }]}>
                 You both tapped — confirm to add them.
