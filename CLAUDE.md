@@ -207,6 +207,62 @@ cadence), `accept_request`, `search_profiles`.
   account** to bump/search/claim against (see "Git / workflow" below for how
   to test that).
 
+## EAS Build & TestFlight (iOS)
+
+`eas.json` (development/preview/production build profiles + a `submit.production.ios`
+block) is checked in. **`eas init` hasn't been run against a real Expo account
+yet**, so `app.json` has no `extra.eas.projectId` — that's the one piece that
+requires a human with an Expo account and a paid Apple Developer Program
+membership; nothing in this environment can complete it. Everything else
+(profiles, scripts, signing config shape) is ready to go. `eas.json`'s
+`submit.production.ios` still has `YOUR_APPLE_ID_EMAIL` / `YOUR_APP_STORE_CONNECT_APP_ID`
+/ `YOUR_APPLE_TEAM_ID` placeholders — fill those in (or switch to an App Store
+Connect API key, see step 4) before the first real submit.
+
+**One-time setup (run locally, needs an Expo account + Apple Developer Program):**
+
+1. `npx eas-cli login` — sign in to (or create) an Expo account.
+2. `npx eas-cli init` — creates the EAS project and writes
+   `extra.eas.projectId` into `app.json` automatically (this is also what
+   unblocks the "Push tokens need an EAS project id" gotcha below).
+3. In App Store Connect, create the app record for bundle id
+   `com.knowable.app` (Apps → + → New App) if it doesn't exist yet. Note its
+   Apple ID number (App Information page) for `ascAppId`, and your Team ID
+   (developer.apple.com → Membership) for `appleTeamId`.
+4. Fill in `eas.json`'s `submit.production.ios` with those values. For
+   non-interactive/repeatable submits, prefer an App Store Connect API key
+   over an Apple ID + password: App Store Connect → Users and Access →
+   Integrations → generate a key, download the `.p8` (never commit it — already
+   gitignored), and set `ascApiKeyPath`/`ascApiKeyId`/`ascApiKeyIssuerId`
+   instead of `appleId`.
+
+**Build + submit:**
+
+```bash
+npm run build:ios:production   # eas build --platform ios --profile production
+                                # first run offers to let EAS generate/manage the
+                                # Distribution Certificate + App Store provisioning
+                                # profile for com.knowable.app — accept it (recommended)
+npm run submit:ios              # eas submit --platform ios --profile production
+                                 # uploads the .ipa to App Store Connect; it shows up
+                                 # under TestFlight after Apple finishes processing
+                                 # (usually minutes). Add internal testers there.
+```
+
+**Fast internal testing without waiting on TestFlight processing** — the
+`preview` profile builds an ad-hoc, internally-distributed IPA (register
+tester devices first):
+
+```bash
+npx eas-cli device:create        # register each tester's device UDID once
+npm run build:ios:preview        # eas build --platform ios --profile preview
+                                  # gives an install link/QR per build
+```
+
+`build:ios:dev-client` (`eas build --platform ios --profile development`) is
+the cloud equivalent of `npx expo run:ios --device` — use it for the NFC
+on-device dev-client build instead of a local Xcode build.
+
 ## Gotchas (learned the hard way)
 
 - **Installs need `--legacy-peer-deps`.** Plain `npm install` aborts on a
@@ -229,9 +285,10 @@ cadence), `accept_request`, `search_profiles`.
   and renders fixed-width copies because `alignSelf`/`numberOfLines` shrink-wrap
   differently than on web. Watch for similar web-vs-native layout gaps.
 - **Push tokens need an EAS project id.** `getExpoPushTokenAsync` wants
-  `extra.eas.projectId` in `app.json`; there isn't one yet (no EAS project
-  configured), so `registerForPushTokenAsync` fails closed (returns `null`)
-  rather than throwing. Real device tokens will start flowing once EAS is set up.
+  `extra.eas.projectId` in `app.json`; `eas init` hasn't been run against a real
+  Expo account yet (see "EAS Build & TestFlight" above), so it's still missing
+  and `registerForPushTokenAsync` fails closed (returns `null`) rather than
+  throwing. Real device tokens will start flowing once `eas init` runs.
 
 ## Git / workflow
 
