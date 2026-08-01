@@ -697,7 +697,15 @@ export function startSupabaseSync(ownerId: string) {
       repository.saveProfile(state.user, state.settings);
     }
     if (state.connections !== prev.connections) {
-      for (const c of state.connections) repository.updateConnectionMember(ownerId, c);
+      // Push only the connection(s) whose object identity actually changed —
+      // setCadence/setConnectionType/archiveConnection/unarchiveConnection
+      // all `.map()` in place, so untouched connections keep their prior
+      // reference. Pushing the whole list here would fire one remote update
+      // per connection for every single-connection edit.
+      const prevById = new Map(prev.connections.map((c) => [c.id, c]));
+      for (const c of state.connections) {
+        if (prevById.get(c.id) !== c) repository.updateConnectionMember(ownerId, c);
+      }
     }
     if (state.pendingConnections !== prev.pendingConnections) {
       const added = state.pendingConnections.filter((p) => !prev.pendingConnections.some((pp) => pp.id === p.id));
