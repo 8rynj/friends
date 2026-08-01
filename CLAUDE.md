@@ -19,6 +19,8 @@ behind the same store API via env vars, and are no-ops until then — see
   via its Expo config plugin, registered in `app.json` → `plugins`
 - **expo-notifications** + **expo-device** for push registration/deep links
   (`src/notifications/`); the backend send function lives in `server/`
+  (Node-callable reference) and its live deployed counterpart is a Supabase
+  Edge Function (`supabase/functions/send-push/`)
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
@@ -83,9 +85,18 @@ supabase/
   migrations/             0001_baseline.sql, 0002_extend.sql — real multi-user
                           schema (profiles, connections, connection_members,
                           contact_log, handles, nudges, pending_connections,
-                          requests) with auth.uid()-scoped RLS + RPCs
+                          requests) with auth.uid()-scoped RLS + RPCs;
+                          0003_connect_creation.sql — NFC/search/SMS connect
+                          creation RPCs; 0004_push_notifications.sql —
+                          push_tokens table + triggers/cron that dispatch to
+                          the send-push edge function (see below)
+  functions/send-push/    Edge function: looks up a recipient's settings +
+                          device tokens and calls the Expo Push API — the
+                          live counterpart of server/sendPush.ts (see
+                          "Push notifications (server-driven)" below)
 server/
-  sendPush.ts             Backend push-send function (Expo Push API) — not yet wired to a live backend
+  sendPush.ts             Node-callable reference push-send function (Expo Push API);
+                          supabase/functions/send-push/ is what's actually deployed
 ```
 
 ## Architecture notes
@@ -111,13 +122,27 @@ server/
   later), then requires an explicit **Connect** tap (mutual confirmation) before
   `addConnection` → `/icebreaker`. A cancelled/failed scan surfaces inline, never
   silently no-ops.
-- **Push notifications (`src/notifications/`, `server/sendPush.ts`)** — the
-  client registers/clears an Expo push token as the Settings `pushNudges` /
-  `pushUpdates` toggles change (`app/_layout.tsx`), and routes a tapped
-  notification's `data.connectionId` to that connection's profile. The backend
-  send function (nudge/connection/new-commonality, Expo Push API) is real and
-  deployable but has no live caller yet — it's the shape the backend (once
-  built) calls after checking a recipient's stored settings.
+- **Push notifications (`src/notifications/`, `server/sendPush.ts`,
+  `supabase/functions/send-push/`, `supabase/migrations/0004_push_notifications.sql`)**
+  — the client registers/clears an Expo push token as the Settings
+  `pushNudges` / `pushUpdates` toggles change (`app/_layout.tsx`), the store's
+  Supabase sync subscriber (`src/store/useStore.ts`) pushes that token to the
+  `push_tokens` table whenever it changes (`src/data/repository.ts`'s
+  `savePushTokenRemote`, keyed by token so re-registering on a reused device
+  reassigns ownership), and a tapped notification's `data.connectionId` routes
+  to that connection's profile (`useNotificationDeepLinks`). Server-side,
+  0004's `confirm_connection` (new connections), `profiles` update trigger
+  (new commonalities — diffs a profile's self-reported facets old vs new
+  against each connection's other side) and a 15-minute `pg_cron` job (due
+  nudges) all fire-and-forget POST to `supabase/functions/send-push/` via
+  `pg_net`, which looks up the recipient's settings/tokens with the service
+  role key and calls the Expo Push API — see "Push notifications
+  (server-driven)" below for the one-time deploy/config steps a human needs
+  to run against a live project (same shape of gap as 2A). `server/sendPush.ts`
+  stays as the Node-callable reference implementation the edge function
+  mirrors (Edge Functions run in an isolated Deno bundle, so it can't import
+  the RN app's TS tree directly — keep nudge/connection/commonality copy in
+  sync between `src/notifications/copy.ts` and the edge function if it changes).
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -263,6 +288,41 @@ npm run build:ios:preview        # eas build --platform ios --profile preview
 the cloud equivalent of `npx expo run:ios --device` — use it for the NFC
 on-device dev-client build instead of a local Xcode build.
 
+## Push notifications (server-driven)
+
+The client side (registration, Settings gate, deep links) and the schema/
+edge-function code (`supabase/migrations/0004_push_notifications.sql`,
+`supabase/functions/send-push/`) are both done — see the "Push notifications"
+architecture note above. Two things still need a human against a live
+project, neither doable from a sandbox:
+
+1. **An EAS project id (2A).** `getExpoPushTokenAsync` returns `null` until
+   `eas init` writes `extra.eas.projectId` into `app.json` — see "EAS Build &
+   TestFlight" above. Without it, devices never get a real Expo push token,
+   so `push_tokens` stays empty regardless of everything else here.
+2. **Deploying the edge function + two Vault secrets**, so Postgres knows
+   where to send the fire-and-forget `pg_net` calls 0004's triggers/cron make:
+   ```bash
+   npx supabase login                              # once, needs a Supabase account
+   npx supabase link --project-ref <your-project-ref>
+   npx supabase functions deploy send-push
+   ```
+   Then, in the SQL editor (or `supabase db push` after step 3):
+   ```sql
+   select vault.create_secret('https://<your-project-ref>.functions.supabase.co', 'edge_function_base_url');
+   select vault.create_secret('<service_role_key from Settings > API>', 'edge_function_service_key');
+   ```
+3. Run `supabase/migrations/0004_push_notifications.sql` (idempotent, like
+   the prior migrations) — it enables `pg_net`/`pg_cron`, adds `push_tokens`,
+   and wires the three dispatch paths. Until step 2's secrets exist,
+   `_dispatch_push` no-ops rather than erroring, so running 0004 before
+   deploying the function is safe.
+
+Once all three are done, pushes are live: `confirm_connection` fires a
+`connection` push immediately, a `profiles` update trigger fires a
+`commonality` push immediately, and a 15-minute cron job fires `nudge`
+pushes for anything due.
+
 ## Gotchas (learned the hard way)
 
 - **Installs need `--legacy-peer-deps`.** Plain `npm install` aborts on a
@@ -317,9 +377,12 @@ reminder per connection's `nextNudge`, gated by the "Nudge reminders" setting
 and OS permission. Native-only (no-op on web), so it doesn't affect the web
 bundle/CI.
 
-Push notifications are scaffolded (`src/notifications/`, `server/sendPush.ts`)
-but not wired to a live backend — no EAS project id (so `registerForPushTokenAsync`
-fails closed), no server calling `sendPush.ts` yet.
+Push notifications are fully wired (`src/notifications/`, `src/data/repository.ts`
+push_tokens sync, `supabase/migrations/0004_push_notifications.sql`,
+`supabase/functions/send-push/`) but not yet live — no EAS project id (so
+`registerForPushTokenAsync` fails closed, `push_tokens` stays empty) and the
+edge function/migration haven't been deployed against a live project; see
+"Push notifications (server-driven)" above for the two remaining human steps.
 
 An on-device QA pass with the live backend + a second real account (bump,
 search send/accept, SMS invite/claim end to end) hasn't been run yet — the

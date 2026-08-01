@@ -1,7 +1,7 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-01** (EAS
-build/TestFlight scaffolding pass) against `main`. Pair this with `CLAUDE.md`
+Living map of what's built and what's next. Last audited **2026-08-01** (2B
+push-notifications wiring pass) against `main`. Pair this with `CLAUDE.md`
 (stack, architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
@@ -30,10 +30,17 @@ production profiles, submit config shape), build/submit npm scripts, and a
 step-by-step CLAUDE.md guide. It's config-only: actually running `eas init`/
 `eas build`/`eas submit` needs a human with an Expo account and a paid Apple
 Developer Program membership, which no sandbox in this project has had so
-far — same shape of gap as 1C's physical-device requirement. Until that
-human step happens, 2B (push notifications) stays blocked on it too, so the
-next remotely-completable milestones are 2C (analytics) and 4A (App Store
-readiness) — see "Recommended order" below.
+far — same shape of gap as 1C's physical-device requirement.
+
+Push notifications (2B) have since been fully wired end-to-end in code —
+device token registration/sync (`push_tokens` table), an edge function, and
+DB triggers/cron for all three push kinds (nudge/connection/commonality) —
+see 2B's row. It could not be deployed or exercised against a live project
+(no Supabase/Expo account access in any sandbox so far, confirmed again this
+pass), and it still needs 2A's EAS project id before real device tokens can
+exist at all, so it stays 🟡 alongside 1C and 2A as a "code done, needs a
+human against live infra" item. The next remotely-completable milestones are
+2C (analytics) and 4A (App Store readiness) — see "Recommended order" below.
 
 ## Status table
 
@@ -48,7 +55,7 @@ readiness) — see "Recommended order" below.
 | B0 | Wire connect **creation** to backend | ✅ | `supabase/migrations/0003_connect_creation.sql` (`get_profile_preview`, `list_incoming_requests`, `preview_pending_connection`, `claim_pending_connection`, `confirm_connection`/`accept_request` gain `method`/`met_context`); `src/data/repository.ts` + `src/store/useStore.ts` (`previewCandidate`/`confirmNfcConnection`, `searchDirectory`, `sendConnectRequest`/`acceptIncoming`/`ignoreIncoming`, `claimInviteByToken`) branch on a signed-in `activeOwnerId`, falling back to the mock pool otherwise; `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. Not yet verified on a live device with two real accounts — see 1C. |
 | 1C | On-device QA pass (post-merge, live backend, second real account) | 🟡 | Code-level pass done remotely (no device/live project available in-session) — walked bump/NFC, search, invite/claim, nudges/notifications, settings, not-interested, where-you-met, auth gate, connection profile. Fixed 3 regressions: (1) `app/_layout.tsx` — global `<StatusBar style="light" />` put white status-bar content on the light cream background on every screen except onboarding/auth; now switches on route segment. (2) `app/claim/[id].tsx` — the directory-preview fallback's "Get Knowable & connect"/"Maybe later" buttons had no `onPress` (dead buttons, reachable via a deep link with an arbitrary id even though no in-app route creates one); wired to `sendConnectRequest`/`router.back()`. (3) `src/store/useStore.ts`'s Supabase sync subscriber pushed an `updateConnectionMember` for every connection on any single connection edit; now diffs by object identity and pushes only the changed one(s), matching the module's own "per-action edits push their specific change" doc. Re-verified `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Still open:** the actual physical-device walkthrough with a live Supabase project and a second real account (NFC tap, SMS OTP receipt, real cross-device claim) — needs a human with hardware; nothing in this environment can do that part. |
 | 2A | EAS Build + TestFlight | 🟡 | `eas.json` added (`development`/`preview`/`production` build profiles, `submit.production.ios` shape); `preview` profile = internal/ad-hoc distribution, `production` = store distribution for TestFlight; `package.json` gets `build:ios:preview`/`build:ios:production`/`build:ios:dev-client`/`submit:ios` scripts; full walkthrough in CLAUDE.md "EAS Build & TestFlight". `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** `eas init` (writes `extra.eas.projectId` into `app.json`), the actual `eas build`, and `eas submit` all need an Expo account login + a paid Apple Developer Program membership + an App Store Connect app record — none available in any sandbox so far. |
-| 2B | Push notifications | 🟡 | `src/notifications/` + `server/sendPush.ts` scaffolded; nothing calls them, no EAS id |
+| 2B | Push notifications | 🟡 | Client: token registration/gate/deep-links unchanged; store now syncs the token to a new `push_tokens` table (`src/data/repository.ts` `savePushTokenRemote`, called from `useStore.ts`'s sync subscriber + `settings.tsx`'s sign-out). Server: `supabase/migrations/0004_push_notifications.sql` adds `push_tokens` + RLS, a `nudges.pushed_at` column, and three dispatch paths — `confirm_connection` fires on new connections, a `profiles` update trigger diffs self-reported facets old vs new and fires on new shared items, a 15-min `pg_cron` job fires due nudges — all via `pg_net` to `supabase/functions/send-push/` (new edge function; looks up the recipient's settings/tokens with the service role key, calls the Expo Push API, gates nudge/commonality on `push_nudges`/`push_updates`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on two human steps, neither available in any sandbox so far:** 2A's `eas init` (no EAS project id yet ⇒ `registerForPushTokenAsync` still fails closed, `push_tokens` stays empty regardless of the rest), and deploying the edge function + setting two Vault secrets (`edge_function_base_url`/`edge_function_service_key`) against a live Supabase project — see CLAUDE.md "Push notifications (server-driven)" for the exact commands. |
 | 2C | Analytics + crash reporting | ⬜ | no PostHog/Sentry |
 | 3A | Data-pull OAuth base + Spotify/Letterboxd | ⬜ | `datapull.ts` fully simulated |
 | 3B | Remaining data-pull adapters | ⬜ | Strava/Goodreads/Bandsintown/Polarsteps/LinkedIn |
@@ -90,7 +97,18 @@ done — see ROADMAP.md's 2A row. What's left needs a human, not another chat:
 run `npx eas-cli login` + `npx eas-cli init` (Expo account), create the
 com.knowable.app app record in App Store Connect (Apple Developer Program),
 fill in eas.json's submit.production.ios, then `npm run build:ios:production`
-+ `npm run submit:ios`. Once done, flip this row to ✅ and unblock 2B.
++ `npm run submit:ios`. Once done, flip this row to ✅ and unblock 2B's push tokens.
+```
+
+### 2B — Push notifications  🟡  *(code done — needs a human for the rest, see row above)*
+```
+Wiring (push_tokens table + sync, supabase/functions/send-push/, confirm_connection/
+profiles-trigger/cron dispatch, settings gate, deep links) is done — see ROADMAP.md's
+2B row. What's left needs a human, not another chat: finish 2A (eas init, so devices
+get real push tokens), then `npx supabase login && npx supabase functions deploy
+send-push`, set the edge_function_base_url/edge_function_service_key Vault secrets,
+and run 0004_push_notifications.sql — see CLAUDE.md "Push notifications
+(server-driven)" for exact commands. Once done, flip this row to ✅.
 ```
 
 ### 2C — Analytics + crash reporting  ⬜  *(parallel-safe, do next)*
@@ -107,15 +125,6 @@ Branch off main. Read CLAUDE.md. Goal: App Store prep — privacy policy + data
 disclosures (contacts/phone), app icon/screenshots/listing copy, and required
 Info.plist usage strings (NFC, contacts, notifications). PR to main + a checklist
 of manual submission steps.
-```
-
-### 2B — Wire push notifications end-to-end  🟡→✅  *(blocked until 2A's human step is done)*
-```
-Branch off main. Read CLAUDE.md. Goal: finish push (scaffolded in src/notifications/
-+ server/sendPush.ts). With the EAS project id set (2A), register device tokens,
-add a Supabase edge function that calls sendPush for nudges / connection-confirmed /
-new-commonality, and deep-link taps. Gate on settings. Verify tsc + tests + web
-bundle. PR to main.
 ```
 
 ### 3A — Data-pull OAuth base + first adapters  ⬜
@@ -150,12 +159,12 @@ Tell me which at the start. Verify tsc + tests + web bundle. PR to main.
 
 ## Recommended order
 
-**1C** (verify the real backend end to end, two accounts) and **2A** (EAS
-build/submit) both need a human with hardware/credentials no sandbox so far
-has had — their remotely-completable parts are done (see their rows). While
-waiting on that human step, do **2C → 4A** (analytics + App Store prep, both
-parallel-safe, no external blockers) next, then **3A → 3B×N → 3C**
-(integrations — 3A needs Spotify keys from the user). Once a human runs 2A's
-login/build/submit steps, **2B** (push) unblocks. Finish with **4B**
-(launch/expand). Do shared-core items in sequence; fan out the parallel-safe
-ones as convenient.
+**1C** (verify the real backend end to end, two accounts), **2A** (EAS
+build/submit), and **2B** (push notifications) all need a human with
+hardware/credentials/live-project access no sandbox so far has had — their
+remotely-completable parts are done (see their rows), and 2B additionally
+needs 2A's `eas init` finished first. While waiting on those human steps, do
+**2C → 4A** (analytics + App Store prep, both parallel-safe, no external
+blockers) next, then **3A → 3B×N → 3C** (integrations — 3A needs Spotify keys
+from the user). Finish with **4B** (launch/expand). Do shared-core items in
+sequence; fan out the parallel-safe ones as convenient.

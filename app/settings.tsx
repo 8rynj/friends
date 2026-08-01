@@ -14,6 +14,7 @@ import { Button, CollageCard, OutlineText, Toggle } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { NudgeCadence } from '../src/data/types';
 import { signOutPhone } from '../src/lib/auth';
+import { savePushTokenRemote } from '../src/data/repository';
 import { Settings, stopSupabaseSync, useStore } from '../src/store/useStore';
 import { requestNudgePermissions } from '../src/engine/notifications';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
   const resetApp = useStore((s) => s.resetApp);
+  const pushToken = useStore((s) => s.pushToken);
   const authPhone = useAuthStore((s) => s.phone);
 
   const set = (patch: Partial<Settings>) => updateSettings(patch);
@@ -52,6 +54,10 @@ export default function SettingsScreen() {
   };
 
   const signOut = async () => {
+    // Clear this device's push token row before stopping sync — otherwise a
+    // signed-out device keeps a live push_tokens row and could still receive
+    // pushes meant for this account until some other device overwrites it.
+    if (pushToken) await savePushTokenRemote(user.id, null, pushToken);
     // Stop syncing before wiping local state back to the mock seed — otherwise
     // the reset would read as real deletes (e.g. pending invites) and push
     // them to Supabase before the session even finishes clearing.
