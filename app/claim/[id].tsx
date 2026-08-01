@@ -60,6 +60,7 @@ export default function ClaimScreen() {
   const pending = useStore((s) => s.pendingConnections.find((p) => p.id === token || p.token === token));
   const claimPending = useStore((s) => s.claimPending);
   const claimInviteByToken = useStore((s) => s.claimInviteByToken);
+  const sendConnectRequest = useStore((s) => s.sendConnectRequest);
   const authStatus = useAuthStore((s) => s.status);
   const authPhone = useAuthStore((s) => s.phone);
 
@@ -228,6 +229,16 @@ export default function ClaimScreen() {
   const { user } = inviter;
   const teaser = computeCommonalities(currentUser, user, 3);
 
+  const onRequestConnect = async () => {
+    if (authStatus !== 'signedIn') {
+      router.push({ pathname: '/auth/phone', params: { redirect: `/claim/${token}` } });
+      return;
+    }
+    const res = await sendConnectRequest(inviter.id);
+    if (res.outcome === 'accepted') router.replace(`/icebreaker?id=${res.connectionId}`);
+    else router.back();
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
@@ -273,8 +284,8 @@ export default function ClaimScreen() {
           )}
 
           <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-            <Button label="Get Knowable & connect" variant="primary" fullWidth />
-            <Button label="Maybe later" variant="secondary" fullWidth />
+            <Button label="Get Knowable & connect" variant="primary" fullWidth onPress={onRequestConnect} />
+            <Button label="Maybe later" variant="secondary" fullWidth onPress={() => router.back()} />
           </View>
           <Text style={[type.body, { color: colors.textMutedOnLight, textAlign: 'center' }]}>
             No account needed to preview. Connecting takes 60 seconds.

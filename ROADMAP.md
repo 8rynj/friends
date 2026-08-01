@@ -1,7 +1,8 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-01** against
-`main`. Pair this with `CLAUDE.md` (stack, architecture, gotchas).
+Living map of what's built and what's next. Last audited **2026-08-01** (code
+QA pass) against `main`. Pair this with `CLAUDE.md` (stack, architecture,
+gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
 
@@ -17,9 +18,12 @@ that real backend too — see B0 below. Two V2 features (not-interested archive,
 structured "where you met") and the mutual-friends graph also already landed.
 The app runs on the iOS simulator/device.
 
-What's left is: an on-device QA pass against the live backend with a second
-real account, shipping a beta (EAS/TestFlight + push + analytics), real
-data-pull integrations, and launch prep.
+A remote **code-level QA pass** (1C) has since walked every flow, fixed the
+regressions it found, and re-verified tsc/tests/web bundle — see 1C's notes.
+It could not exercise a physical device or a live Supabase project (the
+sandbox that ran it has neither), so what's left is: the physical two-real-
+account walkthrough against a live backend, shipping a beta (EAS/TestFlight +
+push + analytics), real data-pull integrations, and launch prep.
 
 ## Status table
 
@@ -32,7 +36,7 @@ data-pull integrations, and launch prep.
 | 1A | Supabase data layer (live) | ✅ | `supabase/migrations/`, `src/data/repository.ts` |
 | 1B | Multi-user auth + owner-scoped RLS | ✅ | phone OTP, `auth.uid()` RLS, RPCs |
 | B0 | Wire connect **creation** to backend | ✅ | `supabase/migrations/0003_connect_creation.sql` (`get_profile_preview`, `list_incoming_requests`, `preview_pending_connection`, `claim_pending_connection`, `confirm_connection`/`accept_request` gain `method`/`met_context`); `src/data/repository.ts` + `src/store/useStore.ts` (`previewCandidate`/`confirmNfcConnection`, `searchDirectory`, `sendConnectRequest`/`acceptIncoming`/`ignoreIncoming`, `claimInviteByToken`) branch on a signed-in `activeOwnerId`, falling back to the mock pool otherwise; `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. Not yet verified on a live device with two real accounts — see 1C. |
-| 1C | On-device QA pass (post-merge, live backend, second real account) | ⬜ | manual |
+| 1C | On-device QA pass (post-merge, live backend, second real account) | 🟡 | Code-level pass done remotely (no device/live project available in-session) — walked bump/NFC, search, invite/claim, nudges/notifications, settings, not-interested, where-you-met, auth gate, connection profile. Fixed 3 regressions: (1) `app/_layout.tsx` — global `<StatusBar style="light" />` put white status-bar content on the light cream background on every screen except onboarding/auth; now switches on route segment. (2) `app/claim/[id].tsx` — the directory-preview fallback's "Get Knowable & connect"/"Maybe later" buttons had no `onPress` (dead buttons, reachable via a deep link with an arbitrary id even though no in-app route creates one); wired to `sendConnectRequest`/`router.back()`. (3) `src/store/useStore.ts`'s Supabase sync subscriber pushed an `updateConnectionMember` for every connection on any single connection edit; now diffs by object identity and pushes only the changed one(s), matching the module's own "per-action edits push their specific change" doc. Re-verified `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Still open:** the actual physical-device walkthrough with a live Supabase project and a second real account (NFC tap, SMS OTP receipt, real cross-device claim) — needs a human with hardware; nothing in this environment can do that part. |
 | 2A | EAS Build + TestFlight | ⬜ | no `eas.json` / `projectId` |
 | 2B | Push notifications | 🟡 | `src/notifications/` + `server/sendPush.ts` scaffolded; nothing calls them, no EAS id |
 | 2C | Analytics + crash reporting | ⬜ | no PostHog/Sentry |
@@ -56,14 +60,17 @@ data-pull integrations, and launch prep.
 
 ## Remaining work — ordered, with kickoff prompts
 
-### 1C — On-device QA pass  ⬜  *(do first)*
+### 1C — Physical two-account device walkthrough  🟡  *(do first)*
 ```
-Branch off main. Read CLAUDE.md. Goal: QA the app on a real device with the live
-Supabase backend configured, using a SECOND real account to verify connect
-creation end to end (NFC bump, Search send/accept, SMS invite/claim — wired in
-B0). Walk every flow (bump, search, invite/claim, nudges, notifications,
-settings, not-interested, where-you-met), fix regressions and color-scheme
-issues. Verify tsc + tests + web bundle. PR to main.
+Branch off main. Read CLAUDE.md + ROADMAP.md's 1C row (a remote code-level pass
+already ran and fixed what it could find — see its notes). Goal: on a PHYSICAL
+device with the live Supabase backend configured, using a SECOND real account,
+verify connect creation end to end (NFC bump — needs real hardware and a dev-
+client/prebuilt build, Search send/accept, SMS invite/claim with a real OTP)
+plus nudges, notifications, settings, not-interested, where-you-met. Fix
+anything a real device/live backend surfaces that static review couldn't catch
+(timing, permissions prompts, deep links, push delivery). Verify tsc + tests +
+web bundle. PR to main.
 ```
 
 ### 2A — EAS Build + TestFlight  ⬜

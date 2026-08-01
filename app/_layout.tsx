@@ -125,6 +125,11 @@ export default function RootLayout() {
   const pathname = usePathname();
   const { redirect } = useGlobalSearchParams<{ redirect?: string }>();
 
+  // Most screens sit on the light cream background (needs dark status bar
+  // content); only onboarding and auth use the dark background (needs light
+  // content) — see each screen's contentStyle in the Stack below.
+  const onDarkBackground = segments[0] === 'onboarding' || segments[0] === 'auth';
+
   useEffect(() => {
     if (!ready || authStatus === 'unconfigured') return;
     const inAuthGroup = segments[0] === 'auth';
@@ -146,7 +151,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={onDarkBackground ? 'light' : 'dark'} />
         <ErrorBoundary>
           <Stack
             screenOptions={{
