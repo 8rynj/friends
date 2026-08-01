@@ -662,6 +662,10 @@ export function startSupabaseSync(ownerId: string) {
   activeOwnerId = ownerId;
 
   const initial = useStore.getState();
+  // Device-local, not part of loadOrSeedRemoteState's profile shape — push it
+  // once up front so a token registered before sign-in still reaches push_tokens.
+  if (initial.pushToken) repository.savePushTokenRemote(ownerId, initial.pushToken, null);
+
   repository
     .loadOrSeedRemoteState(
       {
@@ -712,6 +716,9 @@ export function startSupabaseSync(ownerId: string) {
       const removed = prev.pendingConnections.filter((p) => !state.pendingConnections.some((cp) => cp.id === p.id));
       for (const p of added) repository.createPendingInviteRemote(ownerId, p);
       for (const p of removed) repository.deletePendingInviteRemote(p.id);
+    }
+    if (state.pushToken !== prev.pushToken) {
+      repository.savePushTokenRemote(ownerId, state.pushToken, prev.pushToken);
     }
   });
 }

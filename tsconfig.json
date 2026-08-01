@@ -8,5 +8,18 @@
     // App code pulls in @types/react etc. via imports, so scoping globals to
     // jest doesn't affect it.
     "types": ["jest"]
-  }
+  },
+  // TS "exclude" replaces (doesn't merge with) the extended config's list, so
+  // this repeats expo/tsconfig.base's entries and adds supabase/functions/ —
+  // a separate Deno project (Deno.serve, npm: specifiers, no @types/node)
+  // deployed independently, not part of this Expo/Node build.
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "metro.config.js",
+    "jest.config.js",
+    "android",
+    "ios",
+    "supabase/functions"
+  ]
 }

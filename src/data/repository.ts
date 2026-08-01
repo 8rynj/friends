@@ -25,6 +25,7 @@
  * whenever a real backend is signed in — `src/store/useStore.ts` falls back
  * to the local mock candidate pool (`src/data/mock.ts`) only when it isn't.
  */
+import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import type { Settings } from '../store/useStore';
 import { nudgeCopy } from '../engine/nudges';
@@ -157,6 +158,34 @@ export async function saveProfile(user: User, settings: Settings) {
     if (error) logSyncError('profiles upsert', error);
   } catch (error) {
     logSyncError('profiles upsert', error);
+  }
+}
+
+// --- push_tokens --------------------------------------------------------
+
+/**
+ * Registers (or clears) this device's Expo push token so the send-push edge
+ * function (supabase/functions/send-push/, called from
+ * supabase/migrations/0004_push_notifications.sql) has somewhere to look it
+ * up. `token: null` clears this device's prior token (Settings toggles both
+ * off, or sign-out) rather than leaving a stale row a former owner can no
+ * longer see (RLS) but that would still receive pushes.
+ */
+export async function savePushTokenRemote(ownerId: string, token: string | null, previousToken: string | null) {
+  if (!supabase) return;
+  try {
+    if (previousToken && previousToken !== token) {
+      const { error } = await supabase.from('push_tokens').delete().eq('token', previousToken);
+      if (error) logSyncError('push_tokens delete', error);
+    }
+    if (token) {
+      const { error } = await supabase
+        .from('push_tokens')
+        .upsert({ owner_id: ownerId, token, platform: Platform.OS, updated_at: new Date().toISOString() }, { onConflict: 'token' });
+      if (error) logSyncError('push_tokens upsert', error);
+    }
+  } catch (error) {
+    logSyncError('push_tokens sync', error);
   }
 }
 
