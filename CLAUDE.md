@@ -193,12 +193,19 @@ cadence), `accept_request`, `search_profiles`.
   Supabase isn't configured, `useAuthStore.status` resolves straight to
   `'unconfigured'` and the gate is skipped entirely — the app runs exactly as
   it did before phone auth existed.
-- **NFC bump, Search send/accept, and SMS-invite claim are not wired to the
-  real backend yet** — they still resolve against the local mock candidate
-  pool (`src/data/mock.ts`), even when signed in. The schema and RPCs
-  (`confirm_connection`, `accept_request`, the `requests` table) are ready for
-  this, but wiring it in means a real directory to search/tap against, which
-  needs a second real account to build against and verify — see "Not built yet".
+- **NFC bump, Search send/accept, and SMS-invite claim are wired to the real
+  backend** when signed in (`src/store/useStore.ts`'s `previewCandidate`/
+  `confirmNfcConnection`, `sendConnectRequest`/`acceptIncoming`/
+  `ignoreIncoming`, `claimInviteByToken`) — see
+  `supabase/migrations/0003_connect_creation.sql` for the RPCs
+  (`get_profile_preview`, `list_incoming_requests`,
+  `preview_pending_connection`, `claim_pending_connection`, plus
+  `confirm_connection`/`accept_request` gaining `method`/`met_context`). Each
+  action falls back to the local mock pool (`src/data/mock.ts`) when
+  `activeOwnerId` is unset (Supabase not configured, or signed out) — the
+  offline/demo experience is unchanged. A real connect needs a **second real
+  account** to bump/search/claim against (see "Git / workflow" below for how
+  to test that).
 
 ## Gotchas (learned the hard way)
 
@@ -237,16 +244,15 @@ cadence), `accept_request`, `search_profiles`.
 ## Not built yet
 
 Live data-pull integrations (currently simulated in `src/data/datapull.ts`).
-Types are shaped to accommodate these. (Multi-user accounts and owner-scoped
-`auth.uid()` RLS are **built** — see the Supabase section above. The remaining
-backend gap is wiring connection *creation* — NFC bump, Search send/accept,
-SMS-invite claim — to the real directory instead of the mock pool, detailed at
-the end of this section.)
+Types are shaped to accommodate these. (Multi-user accounts, owner-scoped
+`auth.uid()` RLS, and connection *creation* against the real directory — NFC
+bump, Search send/accept, SMS-invite claim — are all **built**; see the
+Supabase section above.)
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
-`react-native-nfc-manager` — but the id it reads is still resolved against the
-local `newCandidates` mock pool rather than a real signed-up user, since NFC
-bump isn't wired to the backend directory yet (see "Supabase" above).
+`react-native-nfc-manager` — and the id it reads resolves against the real
+directory (`get_profile_preview` + `confirm_connection`) when signed in, or
+the local `newCandidates` mock pool otherwise.
 
 Local nudge reminders ARE wired (`src/engine/notifications.ts` +
 `src/hooks/useNudgeReminders.ts`): expo-notifications schedules an on-device
@@ -258,12 +264,6 @@ Push notifications are scaffolded (`src/notifications/`, `server/sendPush.ts`)
 but not wired to a live backend — no EAS project id (so `registerForPushTokenAsync`
 fails closed), no server calling `sendPush.ts` yet.
 
-A Supabase-backed data layer and passwordless phone auth both exist (see
-above) with real multi-user, `auth.uid()`-scoped RLS — but connection
-*creation* (NFC bump, Search send/accept, SMS-invite claim) still resolves
-against the local mock candidate pool rather than a real directory of other
-signed-up users, so until a second real account exists to connect with,
-`connections`/`nudges` will read back empty for a fresh sign-in. Wiring those
-flows to `confirm_connection`/`accept_request`/the `requests` table (schema
-and RPCs are ready) is the next step, along with a real invite-claim flow
-using `pending_connections.token` (currently only the inviter side syncs).
+An on-device QA pass with the live backend + a second real account (bump,
+search send/accept, SMS invite/claim end to end) hasn't been run yet — the
+wiring is verified by typecheck/tests/web bundle only, not a physical device.

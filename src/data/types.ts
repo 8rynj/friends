@@ -204,6 +204,13 @@ export interface PendingConnection {
   method: ConnectionMethod;
   /** V2: where/when they met, captured by the inviter and carried onto the claimed connection. */
   metContext?: MetContext;
+  /**
+   * Opaque claim-link token (`pending_connections.token`) — only set once a
+   * real Supabase backend is configured. The claim screen looks the invite up
+   * by this, not `id`, since a different (recipient's) device has no local
+   * record of an invite it didn't create.
+   */
+  token?: string;
 }
 
 /** Lifecycle of an outgoing connect request (Search — Spec §5B Method 3). */

@@ -1,20 +1,29 @@
 /**
  * Find someone — Search connect flow (Spec §5B Method 3).
  *
- * Search the directory by name (results show name + photo only — full profiles
- * unlock on connect), send a request with an optional note. Requests resolve by
- * the person's mock disposition: most accept (→ connection + icebreaker), one
- * ignores, demonstrating the ignore / 3-tries / pending-indefinitely rule.
+ * Searches the real directory (`search_profiles`) when signed into a real
+ * Supabase backend, else the local mock pool (`src/data/mock.ts`) — either
+ * way, results show name + photo only (full profiles unlock on connect).
+ * Sending a request against the real backend always lands 'pending' (the
+ * other person has to actually accept — see the Home tab's incoming-request
+ * card); against the mock pool it resolves instantly by a fixed disposition,
+ * demonstrating the ignore / 3-tries / pending-indefinitely rule.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Avatar, EmptyState, OutlineText } from '../src/components';
 import { border, colors, fonts, palette, radii, spacing, type } from '../src/theme';
-import { directory } from '../src/data/mock';
 import { useStore } from '../src/store/useStore';
+
+interface DirectoryResult {
+  id: string;
+  name: string;
+  avatarColor?: string;
+  photo?: string;
+}
 
 export default function FindScreen() {
   const insets = useSafeAreaInsets();
@@ -24,37 +33,46 @@ export default function FindScreen() {
   const [metLocation, setMetLocation] = useState('');
   const [metEvent, setMetEvent] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
+  const [results, setResults] = useState<DirectoryResult[]>([]);
 
   const connections = useStore((s) => s.connections);
   const outgoing = useStore((s) => s.outgoingRequests);
+  const searchDirectory = useStore((s) => s.searchDirectory);
   const sendConnectRequest = useStore((s) => s.sendConnectRequest);
 
-  const q = query.trim().toLowerCase();
-  const results = useMemo(
-    () =>
-      directory.filter(
-        (d) =>
-          !connections.some((c) => c.id === d.id) &&
-          (q ? d.user.name.toLowerCase().includes(q) : true),
-      ),
-    [connections, q],
-  );
+  // Debounced so a real-backend search doesn't fire on every keystroke.
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(() => {
+      searchDirectory(query).then((r) => {
+        if (!cancelled) setResults(r);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, connections, searchDirectory]);
 
   const statusFor = (id: string) => outgoing.find((r) => r.personId === id)?.status;
 
-  const send = (id: string, name: string) => {
+  const send = async (id: string, name: string) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     const met =
       metLocation.trim() || metEvent.trim()
         ? { location: metLocation.trim() || undefined, event: metEvent.trim() || undefined }
         : undefined;
-    const res = sendConnectRequest(id, note.trim() || undefined, met);
+    const res = await sendConnectRequest(id, note.trim() || undefined, met);
     if (res.outcome === 'accepted') {
       router.push(`/icebreaker?id=${res.connectionId}`);
+    } else if (res.outcome === 'pending') {
+      setFlash(`Request sent to ${name} — you’ll connect once they accept.`);
     } else if (res.outcome === 'ignored') {
       setFlash(`${name} isn’t ready to connect yet — you can try again.`);
     } else if (res.outcome === 'blocked') {
       setFlash(`${name} hasn’t responded after 3 requests. It’ll stay pending.`);
+    } else if (res.outcome === 'error') {
+      setFlash("Couldn't send that request — try again.");
     }
   };
 
@@ -141,8 +159,8 @@ export default function FindScreen() {
 
         {results.map((d) => {
           const status = statusFor(d.id);
-          const blocked = status === 'blocked';
-          const label = blocked ? 'Pending' : status === 'ignored' ? 'Try again' : 'Add';
+          const blocked = status === 'blocked' || status === 'pending';
+          const label = status === 'blocked' || status === 'pending' ? 'Pending' : status === 'ignored' ? 'Try again' : 'Add';
           return (
             <View
               key={d.id}
@@ -153,14 +171,14 @@ export default function FindScreen() {
               }}
             >
               {/* Name + photo only until connected (§5B). */}
-              <Avatar name={d.user.name} color={d.user.avatarColor} size={44} />
-              <Text style={[type.cardTitle, { color: colors.nearBlack, flex: 1 }]}>{d.user.name}</Text>
+              <Avatar name={d.name} color={d.avatarColor} size={44} />
+              <Text style={[type.cardTitle, { color: colors.nearBlack, flex: 1 }]}>{d.name}</Text>
               <Pressable
                 disabled={blocked}
-                onPress={() => send(d.id, d.user.name)}
+                onPress={() => send(d.id, d.name)}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 accessibilityRole="button"
-                accessibilityLabel={`${label} ${d.user.name}`}
+                accessibilityLabel={`${label} ${d.name}`}
                 accessibilityState={{ disabled: blocked }}
                 style={{
                   opacity: blocked ? 0.5 : 1,
@@ -180,8 +198,8 @@ export default function FindScreen() {
         {results.length === 0 && (
           <EmptyState
             icon="🔍"
-            title={q ? 'No one found' : 'No one to show'}
-            body={q ? `No one matches “${query.trim()}.”` : 'Everyone nearby is already in your people.'}
+            title={query.trim() ? 'No one found' : 'No one to show'}
+            body={query.trim() ? `No one matches “${query.trim()}.”` : 'Everyone nearby is already in your people.'}
           />
         )}
       </ScrollView>

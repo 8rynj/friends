@@ -1,6 +1,6 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-07-29** against
+Living map of what's built and what's next. Last audited **2026-08-01** against
 `main`. Pair this with `CLAUDE.md` (stack, architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
@@ -11,12 +11,15 @@ V1 + V1.5 are shipped and merged to `main`: the collage design system, all core
 screens, the commonality engine, nudges, the three connect flows (bump / search /
 SMS invite + claim), settings & privacy, and unit tests + CI. A **real
 multi-user Supabase backend** (normalized schema, `auth.uid()`-scoped RLS,
-passwordless phone auth) is built and opt-in via env vars. Two V2 features
-(not-interested archive, structured "where you met") and the mutual-friends graph
-also already landed. The app runs on the iOS simulator/device.
+passwordless phone auth) is built and opt-in via env vars, and connect
+**creation** (NFC bump, Search send/accept, SMS-invite claim) is now wired to
+that real backend too — see B0 below. Two V2 features (not-interested archive,
+structured "where you met") and the mutual-friends graph also already landed.
+The app runs on the iOS simulator/device.
 
-What's left is: connect *creation* against the real backend, shipping a beta
-(EAS/TestFlight + push + analytics), real data-pull integrations, and launch prep.
+What's left is: an on-device QA pass against the live backend with a second
+real account, shipping a beta (EAS/TestFlight + push + analytics), real
+data-pull integrations, and launch prep.
 
 ## Status table
 
@@ -28,8 +31,8 @@ What's left is: connect *creation* against the real backend, shipping a beta
 | — | Local nudge notifications (on-device) | ✅ | `src/engine/notifications.ts`, `useNudgeReminders` |
 | 1A | Supabase data layer (live) | ✅ | `supabase/migrations/`, `src/data/repository.ts` |
 | 1B | Multi-user auth + owner-scoped RLS | ✅ | phone OTP, `auth.uid()` RLS, RPCs |
-| 1C | On-device QA pass (post-merge, live backend) | ⬜ | manual |
-| B0 | Wire connect **creation** to backend | ⬜ | NFC/Search/SMS still use the mock pool |
+| B0 | Wire connect **creation** to backend | ✅ | `supabase/migrations/0003_connect_creation.sql` (`get_profile_preview`, `list_incoming_requests`, `preview_pending_connection`, `claim_pending_connection`, `confirm_connection`/`accept_request` gain `method`/`met_context`); `src/data/repository.ts` + `src/store/useStore.ts` (`previewCandidate`/`confirmNfcConnection`, `searchDirectory`, `sendConnectRequest`/`acceptIncoming`/`ignoreIncoming`, `claimInviteByToken`) branch on a signed-in `activeOwnerId`, falling back to the mock pool otherwise; `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. Not yet verified on a live device with two real accounts — see 1C. |
+| 1C | On-device QA pass (post-merge, live backend, second real account) | ⬜ | manual |
 | 2A | EAS Build + TestFlight | ⬜ | no `eas.json` / `projectId` |
 | 2B | Push notifications | 🟡 | `src/notifications/` + `server/sendPush.ts` scaffolded; nothing calls them, no EAS id |
 | 2C | Analytics + crash reporting | ⬜ | no PostHog/Sentry |
@@ -53,22 +56,14 @@ What's left is: connect *creation* against the real backend, shipping a beta
 
 ## Remaining work — ordered, with kickoff prompts
 
-### B0 — Wire connect creation to the real backend  ⬜  *(do first)*
-```
-Branch off main. Read CLAUDE.md (Supabase section + "Not built yet").
-Goal: wire connection CREATION to the real backend — replace the mock candidate
-pool in NFC bump, Search send/accept, and SMS-invite claim with real Supabase
-directory lookups via confirm_connection / accept_request / the requests table
-and pending_connections.token. Support testing with a second real account.
-Verify tsc + tests + web bundle. PR to main.
-```
-
-### 1C — On-device QA pass  ⬜
+### 1C — On-device QA pass  ⬜  *(do first)*
 ```
 Branch off main. Read CLAUDE.md. Goal: QA the app on a real device with the live
-Supabase backend configured. Walk every flow (bump, search, invite/claim, nudges,
-notifications, settings, not-interested, where-you-met), fix regressions and
-color-scheme issues. Verify tsc + tests + web bundle. PR to main.
+Supabase backend configured, using a SECOND real account to verify connect
+creation end to end (NFC bump, Search send/accept, SMS invite/claim — wired in
+B0). Walk every flow (bump, search, invite/claim, nudges, notifications,
+settings, not-interested, where-you-met), fix regressions and color-scheme
+issues. Verify tsc + tests + web bundle. PR to main.
 ```
 
 ### 2A — EAS Build + TestFlight  ⬜
@@ -135,6 +130,7 @@ Tell me which at the start. Verify tsc + tests + web bundle. PR to main.
 
 ## Recommended order
 
-**B0 → 1C** (get the real backend usable + verified) → **2A → 2B → 2C** (beta +
-instrumentation) → **3A → 3B×N → 3C** (integrations) → **4A → 4B** (launch/expand).
-Do shared-core items in sequence; fan out the parallel-safe ones as convenient.
+**1C** (verify the real backend end to end, two accounts) → **2A → 2B → 2C**
+(beta + instrumentation) → **3A → 3B×N → 3C** (integrations) → **4A → 4B**
+(launch/expand). Do shared-core items in sequence; fan out the parallel-safe
+ones as convenient.

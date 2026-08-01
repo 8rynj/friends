@@ -30,6 +30,7 @@ import {
   currentUser,
   directory,
   incomingRequestsSeed,
+  newCandidates,
   nudges as mockNudges,
   searchIgnorers,
 } from '../data/mock';
@@ -39,10 +40,24 @@ import { palette } from '../theme/colors';
 import { isSupabaseConfigured } from '../lib/supabase';
 import * as repository from '../data/repository';
 
-/** Result of sending a connect request (Search — Spec §5B Method 3). */
+/**
+ * Result of sending a connect request (Search — Spec §5B Method 3).
+ * 'accepted' only happens against the mock pool (offline/unconfigured) — a
+ * real request always lands as 'pending' until the target actually accepts.
+ */
 export type RequestOutcome =
   | { outcome: 'accepted'; connectionId: string }
-  | { outcome: 'ignored' | 'blocked' | 'already' | 'notfound' };
+  | { outcome: 'pending' | 'ignored' | 'blocked' | 'already' | 'notfound' | 'error' };
+
+/** Minimal preview of another user, for confirm-before-connect UI (NFC bump, Spec §5B Method 1). */
+export interface CandidatePreview {
+  id: string;
+  name: string;
+  avatarColor?: string;
+  photo?: string;
+  topHobbies: string[];
+  hobbies: string[];
+}
 
 /** Spaced-repetition cadence → days until the next nudge (Spec §5D). */
 const CADENCE_DAYS: Record<Exclude<NudgeCadence, 'never'>, number> = {
@@ -171,16 +186,24 @@ interface AppState {
   connectDataPull: (source: DataPullSource, input?: DataPullInput) => Promise<{ ok: true } | { ok: false; error: string }>;
 
   // --- Connect flows (Spec §5B/§5C) ---
+  /** Search the directory by name (real `search_profiles` RPC when signed into a real backend, else the local mock pool). */
+  searchDirectory: (query: string) => Promise<{ id: string; name: string; avatarColor?: string; photo?: string }[]>;
   /** Send a connect request to a directory person; resolves by disposition. */
-  sendConnectRequest: (personId: string, note?: string, met?: MetContext) => RequestOutcome;
+  sendConnectRequest: (personId: string, note?: string, met?: MetContext) => Promise<RequestOutcome>;
   /** Accept an incoming request → becomes a connection. Returns its id. */
-  acceptIncoming: (requestId: string) => string | undefined;
+  acceptIncoming: (requestId: string) => Promise<string | undefined>;
   /** Ignore an incoming request. */
-  ignoreIncoming: (requestId: string) => void;
+  ignoreIncoming: (requestId: string) => Promise<void>;
+  /** Look up a bumped NFC tag's id against the real directory (confirm-before-connect UI). Null when it's not a real profile. */
+  previewCandidate: (candidateId: string) => Promise<CandidatePreview | null>;
+  /** Create the connection from a confirmed NFC bump. Returns the connection id. */
+  confirmNfcConnection: (candidate: CandidatePreview) => Promise<string | undefined>;
   /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
   createPendingInvite: (name: string, phone: string, met?: MetContext) => string;
   /** Claim a pending invite → confirmed connection, tagged with the claimant's verified phone. Returns the connection id. */
   claimPending: (pendingId: string, claimantPhone?: string) => string | undefined;
+  /** Claim a pending invite by its claim-link token (the real cross-device path — Spec §5C). Returns the connection id. */
+  claimInviteByToken: (token: string) => Promise<string | undefined>;
   /** Cancel a pending invite. */
   cancelPending: (pendingId: string) => void;
 
@@ -359,15 +382,41 @@ export const useStore = create<AppState>()(
         return { ok: true };
       },
 
-      sendConnectRequest: (personId, note, met) => {
+      searchDirectory: async (query) => {
+        const connections = get().connections;
+        if (activeOwnerId) {
+          const results = await repository.searchProfilesRemote(query);
+          return results.filter((r) => !connections.some((c) => c.id === r.id));
+        }
+        const q = query.trim().toLowerCase();
+        return directory
+          .filter((d) => !connections.some((c) => c.id === d.id) && (q ? d.user.name.toLowerCase().includes(q) : true))
+          .map((d) => ({ id: d.id, name: d.user.name, avatarColor: d.user.avatarColor, photo: d.user.photo }));
+      },
+
+      sendConnectRequest: async (personId, note, met) => {
         const s = get();
         if (s.connections.some((c) => c.id === personId)) return { outcome: 'already' };
+
+        if (activeOwnerId) {
+          try {
+            const status = await repository.sendConnectRequestRemote(activeOwnerId, personId, note, met);
+            const outgoingRequests = await repository.loadOutgoingRequests(activeOwnerId);
+            set({ outgoingRequests });
+            return { outcome: status };
+          } catch (error) {
+            console.warn('[supabase] sendConnectRequest failed', error);
+            return { outcome: 'error' };
+          }
+        }
+
+        // Mock pool (offline/unconfigured): a fixed disposition per person simulates
+        // a real counterpart's accept/ignore, since there's no live directory to ask.
         const person = directory.find((d) => d.id === personId);
         if (!person) return { outcome: 'notfound' };
         const existing = s.outgoingRequests.find((r) => r.personId === personId);
         if (existing?.status === 'blocked') return { outcome: 'blocked' };
 
-        // Mock disposition: ignorers reject; everyone else accepts (§5B Method 3).
         if (searchIgnorers.includes(personId)) {
           const attempts = (existing?.attempts ?? 0) + 1;
           const status: OutgoingRequest['status'] = attempts >= 3 ? 'blocked' : 'ignored';
@@ -392,7 +441,19 @@ export const useStore = create<AppState>()(
         return { outcome: 'accepted', connectionId: personId };
       },
 
-      acceptIncoming: (requestId) => {
+      acceptIncoming: async (requestId) => {
+        if (activeOwnerId) {
+          try {
+            const connectionId = await repository.acceptRequestRemote(requestId);
+            const [connection] = await repository.loadConnections(activeOwnerId, connectionId);
+            if (connection) get().addConnection(connection);
+            set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) }));
+            return connection?.id ?? connectionId;
+          } catch (error) {
+            console.warn('[supabase] acceptIncoming failed', error);
+            return undefined;
+          }
+        }
         const req = get().incomingRequests.find((r) => r.id === requestId);
         if (!req) return undefined;
         get().addConnection(req.connection);
@@ -400,8 +461,55 @@ export const useStore = create<AppState>()(
         return req.connection.id;
       },
 
-      ignoreIncoming: (requestId) =>
-        set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) })),
+      ignoreIncoming: async (requestId) => {
+        set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) }));
+        if (activeOwnerId) await repository.ignoreRequestRemote(requestId);
+      },
+
+      previewCandidate: async (candidateId) => {
+        if (activeOwnerId) {
+          if (candidateId === activeOwnerId) return null;
+          const preview = await repository.getProfilePreview(candidateId);
+          return preview;
+        }
+        // Mock pool (offline/unconfigured) — bump only ever resolves against newCandidates (§5B Method 1).
+        const candidate = newCandidates.find((c) => c.id === candidateId);
+        if (!candidate) return null;
+        return {
+          id: candidate.id,
+          name: candidate.user.name,
+          avatarColor: candidate.user.avatarColor,
+          photo: candidate.user.photo,
+          topHobbies: candidate.user.topHobbies,
+          hobbies: candidate.user.hobbies,
+        };
+      },
+
+      confirmNfcConnection: async (candidate) => {
+        if (activeOwnerId) {
+          try {
+            const connectionId = await repository.confirmConnectionRemote(candidate.id, 'nfc');
+            const [connection] = await repository.loadConnections(activeOwnerId, connectionId);
+            if (connection) {
+              get().addConnection(connection);
+              get().setCadence(connection.id, get().settings.defaultCadence);
+            }
+            return connection?.id ?? connectionId;
+          } catch (error) {
+            console.warn('[supabase] confirmNfcConnection failed', error);
+            return undefined;
+          }
+        }
+        // Mock pool (offline/unconfigured): reuse the full seeded Connection
+        // (previewCandidate only returns a preview-shaped subset) so profile
+        // facets (handles/pulled/etc.) still feed the commonality engine on
+        // the icebreaker screen.
+        const full = newCandidates.find((c) => c.id === candidate.id);
+        if (!full) return undefined;
+        get().addConnection(full);
+        get().setCadence(full.id, get().settings.defaultCadence);
+        return full.id;
+      },
 
       createPendingInvite: (name, phone, met) => {
         const id = genId();
@@ -414,11 +522,33 @@ export const useStore = create<AppState>()(
           expiresAt: addDaysISO(today, 30),
           method: 'sms',
           metContext: met,
+          // Generated client-side (not server-side) so it's usable as the shareable
+          // claim link the moment the invite is created, before the Supabase push resolves.
+          token: genId(),
         };
         set((s) => ({ pendingConnections: [pending, ...s.pendingConnections] }));
         return id;
       },
 
+      claimInviteByToken: async (token) => {
+        if (!activeOwnerId) return undefined;
+        try {
+          const connectionId = await repository.claimPendingRemote(token);
+          const [connection] = await repository.loadConnections(activeOwnerId, connectionId);
+          if (connection) get().addConnection(connection);
+          set((s) => ({ pendingConnections: s.pendingConnections.filter((p) => p.token !== token) }));
+          return connection?.id ?? connectionId;
+        } catch (error) {
+          console.warn('[supabase] claimInviteByToken failed', error);
+          return undefined;
+        }
+      },
+
+      // Offline/self-preview path only (Supabase unconfigured, or an inviter
+      // previewing their own link on the same device): `pendingConnections` is
+      // this user's own outgoing invites, so a real recipient on a different
+      // device never has a local entry to find here — see `claimInviteByToken`
+      // for the real cross-device claim (Spec §5C).
       claimPending: (pendingId, claimantPhone) => {
         const pending = get().pendingConnections.find((p) => p.id === pendingId);
         if (!pending) return undefined;
@@ -512,11 +642,16 @@ export const useStore = create<AppState>()(
  * AsyncStorage persistence only, exactly as before auth/Supabase existed.
  *
  * On start, remote state (once fetched) overwrites the local/mock state that
- * rendered first. After that, `connections`/`nudges`/`pendingConnections`
- * are read-hydrated only — they can't be manufactured from local/mock state
- * (see src/data/repository.ts module docs) — while `profiles` stays a full
- * push-on-change mirror, and per-connection edits (cadence/type/archived) or
- * new/cancelled invites push their specific change directly.
+ * rendered first. After that, `connections`/`nudges`/`pendingConnections`/
+ * `incomingRequests`/`outgoingRequests` are read-hydrated only — they can't
+ * be manufactured from local/mock state (see src/data/repository.ts module
+ * docs) — while `profiles` stays a full push-on-change mirror, and
+ * per-connection edits (cadence/type/archived) or new/cancelled invites push
+ * their specific change directly. NFC bump, Search send/accept, and
+ * SMS-invite claim (`previewCandidate`/`confirmNfcConnection`,
+ * `sendConnectRequest`/`acceptIncoming`/`ignoreIncoming`,
+ * `claimInviteByToken`) branch on `activeOwnerId` themselves to call the real
+ * directory/RPCs instead of the local mock pool.
  */
 let activeOwnerId: string | null = null;
 let syncUnsubscribe: (() => void) | null = null;
@@ -535,6 +670,8 @@ export function startSupabaseSync(ownerId: string) {
         connections: initial.connections,
         nudges: initial.nudges,
         pendingConnections: initial.pendingConnections,
+        incomingRequests: initial.incomingRequests,
+        outgoingRequests: initial.outgoingRequests,
         onboarded: initial.onboarded,
       },
       ownerId,
@@ -547,6 +684,8 @@ export function startSupabaseSync(ownerId: string) {
         connections: remote.connections,
         nudges: remote.nudges,
         pendingConnections: remote.pendingConnections,
+        incomingRequests: remote.incomingRequests,
+        outgoingRequests: remote.outgoingRequests,
         onboarded: remote.onboarded ?? initial.onboarded,
       });
     })

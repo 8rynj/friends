@@ -150,8 +150,8 @@ export default function HomeScreen() {
                   <RequestButton
                     label="Accept"
                     primary
-                    onPress={() => {
-                      const cid = acceptIncoming(req.id);
+                    onPress={async () => {
+                      const cid = await acceptIncoming(req.id);
                       if (cid) router.push(`/icebreaker?id=${cid}`);
                     }}
                   />
