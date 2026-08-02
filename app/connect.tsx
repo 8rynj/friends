@@ -2,10 +2,11 @@
  * Connect — V1.5 light data pull manager (Spec §6 / §8 Integrations).
  *
  * Lists the data-pull platforms; connecting one pulls signals onto the
- * profile and feeds the commonality engine. Letterboxd runs a real (unofficial,
- * username-based) pull; every other source still runs the simulated dev
- * fallback until it gets a real adapter. Connected platforms show their
- * pulled highlights.
+ * profile and feeds the commonality engine. Letterboxd runs a real
+ * (unofficial, username-based) pull; Spotify runs a real OAuth pull once
+ * `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is configured (falls back to the simulated
+ * dev pull otherwise, same as every other source, which has no real adapter
+ * yet). Connected platforms show their pulled highlights.
  */
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -55,15 +56,17 @@ export default function ConnectScreen() {
   const isConnected = (s: DataPullSource) =>
     handles.some((h) => h.source === s && h.dataPulled);
 
-  // The remaining sources still run the simulated dev fallback (per file
-  // header); simulate the in-flight state here so the loading placeholder has
-  // somewhere to live.
-  const pull = (s: DataPullSource) => {
+  // Spotify runs a real OAuth pull when configured (opens the system browser
+  // for consent); everything else but Letterboxd still runs the simulated dev
+  // fallback. Either way `connectDataPull` is async, so await it and surface
+  // any error (auth cancelled, network down, ...) instead of assuming success.
+  const [pullErrors, setPullErrors] = useState<Partial<Record<DataPullSource, string>>>({});
+  const pull = async (s: DataPullSource) => {
     setPulling(s);
-    setTimeout(() => {
-      connectDataPull(s);
-      setPulling(null);
-    }, 700);
+    setPullErrors((e) => ({ ...e, [s]: undefined }));
+    const result = await connectDataPull(s);
+    setPulling(null);
+    if (!result.ok) setPullErrors((e) => ({ ...e, [s]: result.error }));
   };
 
   const [letterboxdUsername, setLetterboxdUsername] = useState(
@@ -210,6 +213,11 @@ export default function ConnectScreen() {
                   />
                 )}
               </View>
+              {!connected && pullErrors[s] ? (
+                <Text style={[type.body, { color: colors.nearBlack, marginTop: 6 }]}>
+                  {pullErrors[s]}
+                </Text>
+              ) : null}
             </CollageCard>
           );
         })}
