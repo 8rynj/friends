@@ -1,7 +1,7 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-01** (2B
-push-notifications wiring pass) against `main`. Pair this with `CLAUDE.md`
+Living map of what's built and what's next. Last audited **2026-08-02** (2C
+analytics + crash reporting pass) against `main`. Pair this with `CLAUDE.md`
 (stack, architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
@@ -39,8 +39,19 @@ see 2B's row. It could not be deployed or exercised against a live project
 (no Supabase/Expo account access in any sandbox so far, confirmed again this
 pass), and it still needs 2A's EAS project id before real device tokens can
 exist at all, so it stays 🟡 alongside 1C and 2A as a "code done, needs a
-human against live infra" item. The next remotely-completable milestones are
-2C (analytics) and 4A (App Store readiness) — see "Recommended order" below.
+human against live infra" item.
+
+Analytics + crash reporting (2C) has since landed — PostHog (`src/lib/analytics.ts`)
+and Sentry (`src/lib/sentry.ts`), both configured entirely through
+`EXPO_PUBLIC_*` env vars and no-ops when unset, same opt-in shape as Supabase.
+`initSentry()` runs at app startup and `ErrorBoundary` reports caught render
+errors; the four requested product events (connect made, nudge acted on,
+data-pull connected, onboarding completed) are tracked at their single source
+of truth in `useStore.ts` and `app/onboarding/index.tsx`. Needs a human with
+PostHog/Sentry accounts to actually see events flow (same "code done, needs
+live credentials" shape as 1C/2A/2B) — nothing in this environment can create
+those accounts. The next remotely-completable milestone is 4A (App Store
+readiness) — see "Recommended order" below.
 
 ## Status table
 
@@ -56,7 +67,7 @@ human against live infra" item. The next remotely-completable milestones are
 | 1C | On-device QA pass (post-merge, live backend, second real account) | 🟡 | Code-level pass done remotely (no device/live project available in-session) — walked bump/NFC, search, invite/claim, nudges/notifications, settings, not-interested, where-you-met, auth gate, connection profile. Fixed 3 regressions: (1) `app/_layout.tsx` — global `<StatusBar style="light" />` put white status-bar content on the light cream background on every screen except onboarding/auth; now switches on route segment. (2) `app/claim/[id].tsx` — the directory-preview fallback's "Get Knowable & connect"/"Maybe later" buttons had no `onPress` (dead buttons, reachable via a deep link with an arbitrary id even though no in-app route creates one); wired to `sendConnectRequest`/`router.back()`. (3) `src/store/useStore.ts`'s Supabase sync subscriber pushed an `updateConnectionMember` for every connection on any single connection edit; now diffs by object identity and pushes only the changed one(s), matching the module's own "per-action edits push their specific change" doc. Re-verified `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Still open:** the actual physical-device walkthrough with a live Supabase project and a second real account (NFC tap, SMS OTP receipt, real cross-device claim) — needs a human with hardware; nothing in this environment can do that part. |
 | 2A | EAS Build + TestFlight | 🟡 | `eas.json` added (`development`/`preview`/`production` build profiles, `submit.production.ios` shape); `preview` profile = internal/ad-hoc distribution, `production` = store distribution for TestFlight; `package.json` gets `build:ios:preview`/`build:ios:production`/`build:ios:dev-client`/`submit:ios` scripts; full walkthrough in CLAUDE.md "EAS Build & TestFlight". `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** `eas init` (writes `extra.eas.projectId` into `app.json`), the actual `eas build`, and `eas submit` all need an Expo account login + a paid Apple Developer Program membership + an App Store Connect app record — none available in any sandbox so far. |
 | 2B | Push notifications | 🟡 | Client: token registration/gate/deep-links unchanged; store now syncs the token to a new `push_tokens` table (`src/data/repository.ts` `savePushTokenRemote`, called from `useStore.ts`'s sync subscriber + `settings.tsx`'s sign-out). Server: `supabase/migrations/0004_push_notifications.sql` adds `push_tokens` + RLS, a `nudges.pushed_at` column, and three dispatch paths — `confirm_connection` fires on new connections, a `profiles` update trigger diffs self-reported facets old vs new and fires on new shared items, a 15-min `pg_cron` job fires due nudges — all via `pg_net` to `supabase/functions/send-push/` (new edge function; looks up the recipient's settings/tokens with the service role key, calls the Expo Push API, gates nudge/commonality on `push_nudges`/`push_updates`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on two human steps, neither available in any sandbox so far:** 2A's `eas init` (no EAS project id yet ⇒ `registerForPushTokenAsync` still fails closed, `push_tokens` stays empty regardless of the rest), and deploying the edge function + setting two Vault secrets (`edge_function_base_url`/`edge_function_service_key`) against a live Supabase project — see CLAUDE.md "Push notifications (server-driven)" for the exact commands. |
-| 2C | Analytics + crash reporting | ⬜ | no PostHog/Sentry |
+| 2C | Analytics + crash reporting | 🟡 | `src/lib/analytics.ts` (PostHog) + `src/lib/sentry.ts` (Sentry), both `EXPO_PUBLIC_*`-gated no-ops when unset; `initSentry()` at startup, `ErrorBoundary` → `captureException`; events tracked: `connect_made` (nfc/search/sms, `useStore.ts`), `nudge_acted_on` (`respondToNudge`), `data_pull_connected` (`connectDataPull`), `onboarding_completed` (`app/onboarding/index.tsx`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** no PostHog/Sentry account in any sandbox so far to verify events actually arrive — see "Analytics + crash reporting (optional)" in CLAUDE.md for setup. |
 | 3A | Data-pull OAuth base + Spotify/Letterboxd | ⬜ | `datapull.ts` fully simulated |
 | 3B | Remaining data-pull adapters | ⬜ | Strava/Goodreads/Bandsintown/Polarsteps/LinkedIn |
 | 3C | Partiful + real mutual graph | 🟡 | mutual graph ✅ (`src/engine/social.ts`); Partiful ⬜ |
@@ -111,14 +122,6 @@ and run 0004_push_notifications.sql — see CLAUDE.md "Push notifications
 (server-driven)" for exact commands. Once done, flip this row to ✅.
 ```
 
-### 2C — Analytics + crash reporting  ⬜  *(parallel-safe, do next)*
-```
-Branch off main. Read CLAUDE.md. Goal: add PostHog (product analytics) + Sentry
-(crash/error). Instrument key events (connect made, nudge acted on, data-pull
-connected, onboarding completed). Keys via EXPO_PUBLIC_* env; no-op when unset.
-Verify tsc + tests + web bundle. PR to main.
-```
-
 ### 4A — App Store readiness  ⬜  *(parallel-safe, do next)*
 ```
 Branch off main. Read CLAUDE.md. Goal: App Store prep — privacy policy + data
@@ -160,11 +163,11 @@ Tell me which at the start. Verify tsc + tests + web bundle. PR to main.
 ## Recommended order
 
 **1C** (verify the real backend end to end, two accounts), **2A** (EAS
-build/submit), and **2B** (push notifications) all need a human with
-hardware/credentials/live-project access no sandbox so far has had — their
-remotely-completable parts are done (see their rows), and 2B additionally
-needs 2A's `eas init` finished first. While waiting on those human steps, do
-**2C → 4A** (analytics + App Store prep, both parallel-safe, no external
-blockers) next, then **3A → 3B×N → 3C** (integrations — 3A needs Spotify keys
-from the user). Finish with **4B** (launch/expand). Do shared-core items in
-sequence; fan out the parallel-safe ones as convenient.
+build/submit), **2B** (push notifications), and now **2C** (analytics/crash —
+code done, needs a human with PostHog/Sentry accounts to verify events flow)
+all need a human with hardware/credentials/live-project access no sandbox so
+far has had; 2B additionally needs 2A's `eas init` finished first. While
+waiting on those human steps, do **4A** (App Store prep, parallel-safe, no
+external blockers) next, then **3A → 3B×N → 3C** (integrations — 3A needs
+Spotify keys from the user). Finish with **4B** (launch/expand). Do
+shared-core items in sequence; fan out the parallel-safe ones as convenient.

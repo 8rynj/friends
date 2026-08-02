@@ -38,6 +38,7 @@ import { runDataPull, DataPullInput } from '../data/datapull';
 import { generateEventNudges } from '../engine/nudges';
 import { palette } from '../theme/colors';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { trackEvent } from '../lib/analytics';
 import * as repository from '../data/repository';
 
 /**
@@ -290,6 +291,7 @@ export const useStore = create<AppState>()(
 
       respondToNudge: (nudgeId, response) => {
         const nudge = get().nudges.find((n) => n.id === nudgeId);
+        trackEvent('nudge_acted_on', { response });
         if (response === 'reached_out' && nudge) {
           // Logging outreach resolves every open nudge on this connection
           // locally (see logOutreach) — mirror that resolution remotely too,
@@ -379,6 +381,7 @@ export const useStore = create<AppState>()(
           user.profileCompletion = computeCompletion(user);
           return { user };
         });
+        trackEvent('data_pull_connected', { source });
         return { ok: true };
       },
 
@@ -438,6 +441,7 @@ export const useStore = create<AppState>()(
           connections: [connection, ...st.connections],
           outgoingRequests: st.outgoingRequests.filter((r) => r.personId !== personId),
         }));
+        trackEvent('connect_made', { method: 'search' });
         return { outcome: 'accepted', connectionId: personId };
       },
 
@@ -448,6 +452,7 @@ export const useStore = create<AppState>()(
             const [connection] = await repository.loadConnections(activeOwnerId, connectionId);
             if (connection) get().addConnection(connection);
             set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) }));
+            trackEvent('connect_made', { method: 'search' });
             return connection?.id ?? connectionId;
           } catch (error) {
             console.warn('[supabase] acceptIncoming failed', error);
@@ -458,6 +463,7 @@ export const useStore = create<AppState>()(
         if (!req) return undefined;
         get().addConnection(req.connection);
         set((s) => ({ incomingRequests: s.incomingRequests.filter((r) => r.id !== requestId) }));
+        trackEvent('connect_made', { method: 'search' });
         return req.connection.id;
       },
 
@@ -494,6 +500,7 @@ export const useStore = create<AppState>()(
               get().addConnection(connection);
               get().setCadence(connection.id, get().settings.defaultCadence);
             }
+            trackEvent('connect_made', { method: 'nfc' });
             return connection?.id ?? connectionId;
           } catch (error) {
             console.warn('[supabase] confirmNfcConnection failed', error);
@@ -508,6 +515,7 @@ export const useStore = create<AppState>()(
         if (!full) return undefined;
         get().addConnection(full);
         get().setCadence(full.id, get().settings.defaultCadence);
+        trackEvent('connect_made', { method: 'nfc' });
         return full.id;
       },
 
@@ -537,6 +545,7 @@ export const useStore = create<AppState>()(
           const [connection] = await repository.loadConnections(activeOwnerId, connectionId);
           if (connection) get().addConnection(connection);
           set((s) => ({ pendingConnections: s.pendingConnections.filter((p) => p.token !== token) }));
+          trackEvent('connect_made', { method: 'sms' });
           return connection?.id ?? connectionId;
         } catch (error) {
           console.warn('[supabase] claimInviteByToken failed', error);
@@ -583,6 +592,7 @@ export const useStore = create<AppState>()(
           connections: [connection, ...s.connections],
           pendingConnections: s.pendingConnections.filter((p) => p.id !== pendingId),
         }));
+        trackEvent('connect_made', { method: 'sms' });
         return id;
       },
 

@@ -6,6 +6,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { colors, spacing } from '../theme';
+import { captureException } from '../lib/sentry';
 import { ErrorState } from './ErrorState';
 
 interface ErrorBoundaryProps {
@@ -21,6 +22,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    captureException(error, { componentStack: info.componentStack });
   }
 
   reset = () => this.setState({ error: null });
