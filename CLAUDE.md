@@ -83,7 +83,7 @@ src/
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts,
                           repository.ts (Supabase repository behind the store)
     adapters/             Real per-platform data-pull adapters: letterboxd.ts (public RSS,
-                          no auth), spotify.ts (OAuth via oauth/)
+                          no auth), spotify.ts (OAuth via oauth/), strava.ts (OAuth via oauth/)
     oauth/                Reusable OAuth base for adapters: authorizationCode.ts (Authorization
                           Code + PKCE flow), pkce.ts (verifier/challenge), tokenStore.ts
                           (per-source token persistence on secureStore.ts)
@@ -172,27 +172,34 @@ server/
 - **Data pull (`src/data/datapull.ts`, `src/data/adapters/`, `src/data/oauth/`)**
   — `runDataPull(source, input)` is what screens call; it routes to a real
   adapter when one exists and is usable, else falls back to `simulatePull`
-  (still the only path for Goodreads/Strava/Bandsintown/Polarsteps/LinkedIn).
+  (still the only path for Goodreads/Bandsintown/Polarsteps/LinkedIn).
   Letterboxd (`adapters/letterboxd.ts`) reads a member's public RSS diary feed
   — no auth, since Letterboxd's real API is by-application-only. Spotify
-  (`adapters/spotify.ts`) runs a real Authorization Code + PKCE OAuth flow
-  once `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is set (`isSpotifyConfigured`), on the
-  reusable base in `src/data/oauth/`: `authorizationCode.ts` opens the
-  provider's consent screen via `expo-web-browser`'s `openAuthSessionAsync`
-  (`ASWebAuthenticationSession` on iOS / Custom Tabs on Android) and redirects
-  back through the app's `knowable://` scheme, `pkce.ts` generates the
-  verifier/challenge via `expo-crypto`, and `tokenStore.ts` persists the
-  resulting access/refresh tokens through `src/lib/secureStore.ts`
-  (Keychain/Keystore on native; AsyncStorage on web, where there's no
-  equivalent secure-at-rest API — fine for the CI web-bundle check, the
-  shipped app is native). PKCE is a public-client flow, so no client secret
-  ships in the app. Every adapter throws a typed `*Error` with a
-  user-facing message on failure (network down, auth cancelled, profile
-  private/empty, ...) rather than silently substituting simulated data under
-  the user's real identity — `connectDataPull` (`useStore.ts`) surfaces it to
-  `app/connect.tsx` instead of writing anything to the profile. The OAuth base
-  is provider-agnostic — the next adapter (ROADMAP 3B, e.g. Strava) reuses
-  `oauth/` rather than hand-rolling its own PKCE/token-exchange/refresh.
+  (`adapters/spotify.ts`) and Strava (`adapters/strava.ts`) both run a real
+  Authorization Code OAuth flow on the reusable base in `src/data/oauth/`:
+  `authorizationCode.ts` opens the provider's consent screen via
+  `expo-web-browser`'s `openAuthSessionAsync` (`ASWebAuthenticationSession` on
+  iOS / Custom Tabs on Android) and redirects back through the app's
+  `knowable://` scheme, `pkce.ts` generates the verifier/challenge via
+  `expo-crypto`, and `tokenStore.ts` persists the resulting access/refresh
+  tokens through `src/lib/secureStore.ts` (Keychain/Keystore on native;
+  AsyncStorage on web, where there's no equivalent secure-at-rest API — fine
+  for the CI web-bundle check, the shipped app is native). Spotify is a pure
+  PKCE public-client flow (`isSpotifyConfigured` needs only
+  `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, no secret ships in the app); Strava's token
+  endpoint has no PKCE-only option and requires `client_secret` on every
+  exchange/refresh (`OAuthProviderConfig.clientSecret`,
+  `isStravaConfigured` needs both `EXPO_PUBLIC_STRAVA_CLIENT_ID` and
+  `EXPO_PUBLIC_STRAVA_CLIENT_SECRET`) — that secret ships in the app bundle
+  like any `EXPO_PUBLIC_*` var, the same trade-off every mobile Strava
+  integration makes absent a backend proxy. Every adapter throws a typed
+  `*Error` with a user-facing message on failure (network down, auth
+  cancelled, profile private/empty, ...) rather than silently substituting
+  simulated data under the user's real identity — `connectDataPull`
+  (`useStore.ts`) surfaces it to `app/connect.tsx` instead of writing
+  anything to the profile. The OAuth base is provider-agnostic — the
+  remaining adapters (ROADMAP 3B: Goodreads/Bandsintown/Polarsteps/LinkedIn)
+  reuse `oauth/` rather than hand-rolling their own token-exchange/refresh.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -430,6 +437,12 @@ pushes for anything due.
   `knowable://spotify-auth-callback` as a Redirect URI in the Spotify
   Developer Dashboard for the app behind `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, or
   the consent screen will redirect back to a URI Spotify rejects.
+- **Strava OAuth needs both a Client ID and Secret, and a callback domain.**
+  Strava's `/oauth/token` has no PKCE-only path (see the "Data pull"
+  architecture note), so `EXPO_PUBLIC_STRAVA_CLIENT_SECRET` is required
+  alongside `EXPO_PUBLIC_STRAVA_CLIENT_ID` — Strava won't issue tokens with
+  just the PKCE verifier. Register `knowable` as the Authorization Callback
+  Domain at strava.com/settings/api.
 
 ## Git / workflow
 
@@ -442,9 +455,9 @@ pushes for anything due.
 ## Not built yet
 
 Most live data-pull integrations are still simulated in `src/data/datapull.ts`
-— Goodreads, Strava, Bandsintown, Polarsteps, LinkedIn have no real adapter
-yet. Letterboxd and Spotify are real (see the "Data pull" architecture note
-above); types were already shaped to accommodate the rest. (Multi-user
+— Goodreads, Bandsintown, Polarsteps, LinkedIn have no real adapter yet.
+Letterboxd, Spotify, and Strava are real (see the "Data pull" architecture
+note above); types were already shaped to accommodate the rest. (Multi-user
 accounts, owner-scoped `auth.uid()` RLS, and connection *creation* against the
 real directory — NFC bump, Search send/accept, SMS-invite claim — are all
 **built**; see the Supabase section above.)

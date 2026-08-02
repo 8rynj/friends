@@ -20,6 +20,15 @@ export interface OAuthProviderConfig {
   authorizationEndpoint: string;
   tokenEndpoint: string;
   clientId: string;
+  /**
+   * Present only for providers whose token endpoint is confidential-client-only
+   * (e.g. Strava, which requires `client_secret` on every token/refresh request
+   * with no PKCE-only alternative). Omit for public-client PKCE providers like
+   * Spotify. When set, this ships inside the app bundle same as `clientId` —
+   * not truly secret on-device, but it's the provider's own documented mobile
+   * flow, not a workaround.
+   */
+  clientSecret?: string;
   scopes: string[];
   /** Unique path segment appended to the app's `knowable://` redirect scheme. */
   redirectPath: string;
@@ -74,28 +83,28 @@ export async function authorize(config: OAuthProviderConfig): Promise<OAuthToken
     throw new OAuthError('Authorization response failed a security check — try again.');
   }
 
-  return requestTokens(
-    config.tokenEndpoint,
-    new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      client_id: config.clientId,
-      code_verifier: verifier,
-    }),
-  );
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+    client_id: config.clientId,
+    code_verifier: verifier,
+  });
+  if (config.clientSecret) body.set('client_secret', config.clientSecret);
+
+  return requestTokens(config.tokenEndpoint, body);
 }
 
 /** Exchanges a refresh token for a new access token (no browser round-trip). */
 export async function refresh(config: OAuthProviderConfig, refreshToken: string): Promise<OAuthTokens> {
-  return requestTokens(
-    config.tokenEndpoint,
-    new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      client_id: config.clientId,
-    }),
-  );
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: config.clientId,
+  });
+  if (config.clientSecret) body.set('client_secret', config.clientSecret);
+
+  return requestTokens(config.tokenEndpoint, body);
 }
 
 async function requestTokens(tokenEndpoint: string, body: URLSearchParams): Promise<OAuthTokens> {
