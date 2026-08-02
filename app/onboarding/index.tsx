@@ -31,6 +31,7 @@ import { handleMeta } from '../../src/data/mock';
 import { hobbyCatalog } from '../../src/data/catalog';
 import { HandleSource } from '../../src/data/types';
 import { useStore } from '../../src/store/useStore';
+import { trackEvent } from '../../src/lib/analytics';
 
 const MAX_TOP = 5;
 const HANDLE_OPTIONS: HandleSource[] = [
@@ -90,6 +91,7 @@ export default function OnboardingScreen() {
       topHobbies: top,
       handles: merged,
     });
+    trackEvent('onboarding_completed');
     router.replace('/(tabs)');
   };
   const next = () => (step < TOTAL_STEPS - 1 ? setStep(step + 1) : finish());

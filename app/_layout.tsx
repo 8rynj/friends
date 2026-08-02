@@ -42,8 +42,11 @@ import { startSupabaseSync, stopSupabaseSync, useStore } from '../src/store/useS
 import { useNudgeReminders } from '../src/hooks/useNudgeReminders';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { registerForPushTokenAsync, useNotificationDeepLinks } from '../src/notifications';
+import { initSentry } from '../src/lib/sentry';
+import { identifyUser, resetAnalytics } from '../src/lib/analytics';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+initSentry();
 
 export default function RootLayout() {
   const [loaded, fontError] = useFonts({
@@ -72,6 +75,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (authUserId) completeProfile({ phone: authPhone ?? undefined, id: authUserId });
   }, [authUserId, authPhone, completeProfile]);
+
+  // Tie analytics identity to the auth session (no-op when PostHog isn't configured).
+  useEffect(() => {
+    if (authStatus === 'signedIn' && authUserId) {
+      identifyUser(authUserId);
+    } else if (authStatus === 'signedOut') {
+      resetAnalytics();
+    }
+  }, [authStatus, authUserId]);
 
   // Sync starts only once we have both a hydrated local store and a real
   // signed-in user's id — see useStore.ts's startSupabaseSync docs.

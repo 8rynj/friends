@@ -21,6 +21,9 @@ behind the same store API via env vars, and are no-ops until then — see
   (`src/notifications/`); the backend send function lives in `server/`
   (Node-callable reference) and its live deployed counterpart is a Supabase
   Edge Function (`supabase/functions/send-push/`)
+- **posthog-react-native** (product analytics) + **@sentry/react-native**
+  (crash/error reporting) — both configured via `EXPO_PUBLIC_*` env vars and
+  no-ops when unset (`src/lib/analytics.ts`, `src/lib/sentry.ts`)
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
@@ -76,7 +79,8 @@ src/
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts,
                           repository.ts (Supabase repository behind the store)
   lib/                    supabase.ts (client + isSupabaseConfigured), auth.ts (phone OTP calls),
-                          phone.ts (E.164 normalize/validate)
+                          phone.ts (E.164 normalize/validate), analytics.ts (PostHog),
+                          sentry.ts (crash reporting)
   engine/                 commonality.ts (the matching engine), nudges.ts
   notifications/          push token registration, copy builders, tap-to-open deep links
   hooks/                  useReducedMotion
@@ -143,6 +147,18 @@ server/
   mirrors (Edge Functions run in an isolated Deno bundle, so it can't import
   the RN app's TS tree directly — keep nudge/connection/commonality copy in
   sync between `src/notifications/copy.ts` and the edge function if it changes).
+- **Analytics + crash reporting (`src/lib/analytics.ts`, `src/lib/sentry.ts`)**
+  — both configured entirely through `EXPO_PUBLIC_*` env vars (see
+  `.env.example`) and no-ops when unset, same pattern as Supabase.
+  `initSentry()` runs at module load in `app/_layout.tsx` (before any render);
+  `ErrorBoundary` reports caught render errors via `captureException`. Four
+  key product events are tracked at their single source of truth: `connect_made`
+  (`{ method: 'nfc' | 'search' | 'sms' }`, every path in `useStore.ts` that
+  creates a connection — NFC confirm, search send/accept, SMS claim),
+  `nudge_acted_on` (`{ response }`, `respondToNudge`), `data_pull_connected`
+  (`{ source }`, `connectDataPull`), and `onboarding_completed`
+  (`app/onboarding/index.tsx`'s `finish()`). Analytics identity is tied to the
+  auth session in `app/_layout.tsx` (`identifyUser`/`resetAnalytics`).
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -231,6 +247,33 @@ cadence), `accept_request`, `search_profiles`.
   offline/demo experience is unchanged. A real connect needs a **second real
   account** to bump/search/claim against (see "Git / workflow" below for how
   to test that).
+
+## Analytics + crash reporting (optional)
+
+Both are opt-in via env vars, exactly like Supabase — with none set, the app
+runs with zero analytics/error-reporting network calls, same as today.
+
+**PostHog:**
+
+1. Create a project at posthog.com (or use an existing one).
+2. Copy `.env.example` to `.env.local` (if you haven't already for Supabase)
+   and fill in `EXPO_PUBLIC_POSTHOG_API_KEY` from Project Settings → API Keys.
+   Set `EXPO_PUBLIC_POSTHOG_HOST` too if you're on EU Cloud or self-hosted
+   (defaults to PostHog Cloud US).
+3. Restart Metro (`npx expo start -c`).
+
+**Sentry:**
+
+1. Create a project at sentry.io (React Native platform).
+2. Fill in `EXPO_PUBLIC_SENTRY_DSN` from Settings → Projects → \<project\> →
+   Client Keys (DSN).
+3. Restart Metro.
+
+Neither wires up `@sentry/react-native`'s Expo config plugin (native
+build-time source-map upload) — that needs a Sentry auth token + org/project
+slugs and only matters once real builds exist (same "needs a human + EAS
+project" shape as 2A/2B); add `@sentry/react-native/expo` to `app.json` →
+`plugins` when that's set up.
 
 ## EAS Build & TestFlight (iOS)
 
