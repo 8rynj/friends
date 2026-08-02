@@ -1,8 +1,8 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-02** (2C
-analytics + crash reporting pass) against `main`. Pair this with `CLAUDE.md`
-(stack, architecture, gotchas).
+Living map of what's built and what's next. Last audited **2026-08-02** (3A
+data-pull OAuth base + Letterboxd/Spotify pass) against `main`. Pair this with
+`CLAUDE.md` (stack, architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
 
@@ -50,8 +50,24 @@ data-pull connected, onboarding completed) are tracked at their single source
 of truth in `useStore.ts` and `app/onboarding/index.tsx`. Needs a human with
 PostHog/Sentry accounts to actually see events flow (same "code done, needs
 live credentials" shape as 1C/2A/2B) — nothing in this environment can create
-those accounts. The next remotely-completable milestone is 4A (App Store
-readiness) — see "Recommended order" below.
+those accounts.
+
+Data-pull OAuth base + first adapters (3A) has since landed too — a reusable
+Authorization Code + PKCE OAuth base (`src/data/oauth/`) with Keychain/Keystore-
+backed token storage (`src/lib/secureStore.ts`), replacing the simulation in
+`src/data/datapull.ts` for two sources while keeping every other source's
+simulated fallback and the same `PulledData` shape (engine/UI unchanged).
+Letterboxd (`src/data/adapters/letterboxd.ts`, real, needs no keys — reads a
+member's public RSS diary feed) landed in an earlier pass; this pass adds
+Spotify (`src/data/adapters/spotify.ts`, real Authorization Code + PKCE against
+Spotify's Web API). Spotify is code-complete but needs a human to supply
+`EXPO_PUBLIC_SPOTIFY_CLIENT_ID` and register the app's redirect URI on a real
+Spotify developer account before it can run end to end — same "code done,
+needs live credentials" shape as 1C/2A/2B/2C — so 3A stays 🟡. The remaining
+data-pull sources (Goodreads, Strava, Bandsintown, Polarsteps, LinkedIn — 3B)
+can now reuse this OAuth base instead of hand-rolling their own. The next
+remotely-completable milestone is 4A (App Store readiness) — see "Recommended
+order" below.
 
 ## Status table
 
@@ -68,8 +84,8 @@ readiness) — see "Recommended order" below.
 | 2A | EAS Build + TestFlight | 🟡 | `eas.json` added (`development`/`preview`/`production` build profiles, `submit.production.ios` shape); `preview` profile = internal/ad-hoc distribution, `production` = store distribution for TestFlight; `package.json` gets `build:ios:preview`/`build:ios:production`/`build:ios:dev-client`/`submit:ios` scripts; full walkthrough in CLAUDE.md "EAS Build & TestFlight". `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** `eas init` (writes `extra.eas.projectId` into `app.json`), the actual `eas build`, and `eas submit` all need an Expo account login + a paid Apple Developer Program membership + an App Store Connect app record — none available in any sandbox so far. |
 | 2B | Push notifications | 🟡 | Client: token registration/gate/deep-links unchanged; store now syncs the token to a new `push_tokens` table (`src/data/repository.ts` `savePushTokenRemote`, called from `useStore.ts`'s sync subscriber + `settings.tsx`'s sign-out). Server: `supabase/migrations/0004_push_notifications.sql` adds `push_tokens` + RLS, a `nudges.pushed_at` column, and three dispatch paths — `confirm_connection` fires on new connections, a `profiles` update trigger diffs self-reported facets old vs new and fires on new shared items, a 15-min `pg_cron` job fires due nudges — all via `pg_net` to `supabase/functions/send-push/` (new edge function; looks up the recipient's settings/tokens with the service role key, calls the Expo Push API, gates nudge/commonality on `push_nudges`/`push_updates`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on two human steps, neither available in any sandbox so far:** 2A's `eas init` (no EAS project id yet ⇒ `registerForPushTokenAsync` still fails closed, `push_tokens` stays empty regardless of the rest), and deploying the edge function + setting two Vault secrets (`edge_function_base_url`/`edge_function_service_key`) against a live Supabase project — see CLAUDE.md "Push notifications (server-driven)" for the exact commands. |
 | 2C | Analytics + crash reporting | 🟡 | `src/lib/analytics.ts` (PostHog) + `src/lib/sentry.ts` (Sentry), both `EXPO_PUBLIC_*`-gated no-ops when unset; `initSentry()` at startup, `ErrorBoundary` → `captureException`; events tracked: `connect_made` (nfc/search/sms, `useStore.ts`), `nudge_acted_on` (`respondToNudge`), `data_pull_connected` (`connectDataPull`), `onboarding_completed` (`app/onboarding/index.tsx`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** no PostHog/Sentry account in any sandbox so far to verify events actually arrive — see "Analytics + crash reporting (optional)" in CLAUDE.md for setup. |
-| 3A | Data-pull OAuth base + Spotify/Letterboxd | ⬜ | `datapull.ts` fully simulated |
-| 3B | Remaining data-pull adapters | ⬜ | Strava/Goodreads/Bandsintown/Polarsteps/LinkedIn |
+| 3A | Data-pull OAuth base + Spotify/Letterboxd | 🟡 | OAuth/token infra `src/data/oauth/` (`authorizationCode.ts` — Authorization Code + PKCE, provider-agnostic; `pkce.ts`; `tokenStore.ts`) + `src/lib/secureStore.ts` (Keychain/Keystore, AsyncStorage fallback on web); `src/data/adapters/letterboxd.ts` (real, public RSS, no keys needed) + `src/data/adapters/spotify.ts` (real OAuth, needs `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`); `runDataPull` (`datapull.ts`) routes to a real adapter when usable, else `simulatePull` — same `PulledData` shape, engine/UI unchanged; `app/connect.tsx` awaits the (now-async end to end) pull and surfaces adapter errors inline. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Blocked on a human:** no live Spotify developer account/Client ID in any sandbox so far to verify the OAuth round-trip end to end (same "code done, needs live credentials" shape as 1C/2A/2B/2C) — see CLAUDE.md's "Spotify OAuth needs a redirect URI" gotcha for the one-time setup. |
+| 3B | Remaining data-pull adapters | ⬜ | Strava/Goodreads/Bandsintown/Polarsteps/LinkedIn — can now reuse `src/data/oauth/` |
 | 3C | Partiful + real mutual graph | 🟡 | mutual graph ✅ (`src/engine/social.ts`); Partiful ⬜ |
 | 4A | App Store readiness | ⬜ | no privacy policy / Info.plist usage strings |
 | 4B | Remaining V2 + Android | 🟡 | not-interested ✅ & where-you-met ✅; crush ⬜, Android ⬜ |
@@ -122,6 +138,17 @@ and run 0004_push_notifications.sql — see CLAUDE.md "Push notifications
 (server-driven)" for exact commands. Once done, flip this row to ✅.
 ```
 
+### 3A — Data-pull OAuth base + Spotify/Letterboxd  🟡  *(code done — needs a human for the rest)*
+```
+OAuth/token infra (src/data/oauth/), secure token storage (src/lib/secureStore.ts),
+and both adapters (Letterboxd real/no-keys, Spotify real OAuth) are done — see
+ROADMAP.md's 3A row. What's left needs a human, not another chat: create a
+Spotify app at developer.spotify.com/dashboard, add "knowable://spotify-auth-callback"
+as a Redirect URI, set EXPO_PUBLIC_SPOTIFY_CLIENT_ID (.env.local), then verify
+the OAuth round-trip + top-artists pull on a real device. Once done, flip this
+row to ✅.
+```
+
 ### 4A — App Store readiness  ⬜  *(parallel-safe, do next)*
 ```
 Branch off main. Read CLAUDE.md. Goal: App Store prep — privacy policy + data
@@ -130,20 +157,12 @@ Info.plist usage strings (NFC, contacts, notifications). PR to main + a checklis
 of manual submission steps.
 ```
 
-### 3A — Data-pull OAuth base + first adapters  ⬜
-```
-Branch off main. Read CLAUDE.md. Goal: make data-pull real, replacing the
-simulation in src/data/datapull.ts while keeping the SAME PulledData shape
-(engine/UI unchanged). Build OAuth/token infra + secure token storage, then
-implement Letterboxd and Spotify. Keep simulatePull as dev fallback. Verify tsc +
-tests + web bundle. PR to main. (I'll supply Spotify developer keys.)
-```
-
-### 3B — Remaining data-pull adapters  ⬜  *(parallel-safe after 3A)*
+### 3B — Remaining data-pull adapters  ⬜  *(parallel-safe now — OAuth base already ✅)*
 ```
 Branch off main. Read CLAUDE.md. Goal: add ONE real data-pull adapter on the
-OAuth base from 3A — [Strava | Goodreads | Bandsintown | Polarsteps | LinkedIn].
-Same PulledData shape, sim fallback. Verify tsc + tests + web bundle. PR to main.
+OAuth base in src/data/oauth/ (see 3A) — [Strava | Goodreads | Bandsintown |
+Polarsteps | LinkedIn]. Same PulledData shape, sim fallback. Verify tsc +
+tests + web bundle. PR to main.
 ```
 
 ### 3C — Partiful integration  ⬜  *(mutual graph already ✅)*
@@ -163,11 +182,12 @@ Tell me which at the start. Verify tsc + tests + web bundle. PR to main.
 ## Recommended order
 
 **1C** (verify the real backend end to end, two accounts), **2A** (EAS
-build/submit), **2B** (push notifications), and now **2C** (analytics/crash —
-code done, needs a human with PostHog/Sentry accounts to verify events flow)
-all need a human with hardware/credentials/live-project access no sandbox so
-far has had; 2B additionally needs 2A's `eas init` finished first. While
-waiting on those human steps, do **4A** (App Store prep, parallel-safe, no
-external blockers) next, then **3A → 3B×N → 3C** (integrations — 3A needs
-Spotify keys from the user). Finish with **4B** (launch/expand). Do
-shared-core items in sequence; fan out the parallel-safe ones as convenient.
+build/submit), **2B** (push notifications), **2C** (analytics/crash), and now
+**3A** (Spotify OAuth) are all "code done, needs a human with
+hardware/credentials/live-project access" — none available in any sandbox so
+far; 2B additionally needs 2A's `eas init` finished first. While waiting on
+those human steps, do **4A** (App Store prep, parallel-safe, no external
+blockers) next, then **3B×N → 3C** (remaining integrations — 3B no longer
+blocked on anything, the OAuth base landed with 3A). Finish with **4B**
+(launch/expand). Do shared-core items in sequence; fan out the parallel-safe
+ones as convenient.

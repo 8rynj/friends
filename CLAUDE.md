@@ -24,6 +24,10 @@ behind the same store API via env vars, and are no-ops until then — see
 - **posthog-react-native** (product analytics) + **@sentry/react-native**
   (crash/error reporting) — both configured via `EXPO_PUBLIC_*` env vars and
   no-ops when unset (`src/lib/analytics.ts`, `src/lib/sentry.ts`)
+- **expo-auth-session** + **expo-web-browser** (OAuth Authorization Code +
+  PKCE for real data-pull adapters) + **expo-crypto** (PKCE verifier/challenge)
+  + **expo-secure-store** (Keychain/Keystore-backed token storage) —
+  `src/data/oauth/`, `src/lib/secureStore.ts`
 - **Space Grotesk** via `@expo-google-fonts/space-grotesk` — used everywhere
 
 ## Run & verify
@@ -78,9 +82,15 @@ src/
   components/             collage design-system primitives + UI (barrel: index.ts)
   data/                   types.ts, mock.ts, catalog.ts (hobbies/bucket/cert lists), datapull.ts,
                           repository.ts (Supabase repository behind the store)
+    adapters/             Real per-platform data-pull adapters: letterboxd.ts (public RSS,
+                          no auth), spotify.ts (OAuth via oauth/)
+    oauth/                Reusable OAuth base for adapters: authorizationCode.ts (Authorization
+                          Code + PKCE flow), pkce.ts (verifier/challenge), tokenStore.ts
+                          (per-source token persistence on secureStore.ts)
   lib/                    supabase.ts (client + isSupabaseConfigured), auth.ts (phone OTP calls),
                           phone.ts (E.164 normalize/validate), analytics.ts (PostHog),
-                          sentry.ts (crash reporting)
+                          sentry.ts (crash reporting), secureStore.ts (Keychain/Keystore-backed
+                          key-value store, web falls back to AsyncStorage)
   engine/                 commonality.ts (the matching engine), nudges.ts
   notifications/          push token registration, copy builders, tap-to-open deep links
   hooks/                  useReducedMotion
@@ -159,6 +169,30 @@ server/
   (`{ source }`, `connectDataPull`), and `onboarding_completed`
   (`app/onboarding/index.tsx`'s `finish()`). Analytics identity is tied to the
   auth session in `app/_layout.tsx` (`identifyUser`/`resetAnalytics`).
+- **Data pull (`src/data/datapull.ts`, `src/data/adapters/`, `src/data/oauth/`)**
+  — `runDataPull(source, input)` is what screens call; it routes to a real
+  adapter when one exists and is usable, else falls back to `simulatePull`
+  (still the only path for Goodreads/Strava/Bandsintown/Polarsteps/LinkedIn).
+  Letterboxd (`adapters/letterboxd.ts`) reads a member's public RSS diary feed
+  — no auth, since Letterboxd's real API is by-application-only. Spotify
+  (`adapters/spotify.ts`) runs a real Authorization Code + PKCE OAuth flow
+  once `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is set (`isSpotifyConfigured`), on the
+  reusable base in `src/data/oauth/`: `authorizationCode.ts` opens the
+  provider's consent screen via `expo-web-browser`'s `openAuthSessionAsync`
+  (`ASWebAuthenticationSession` on iOS / Custom Tabs on Android) and redirects
+  back through the app's `knowable://` scheme, `pkce.ts` generates the
+  verifier/challenge via `expo-crypto`, and `tokenStore.ts` persists the
+  resulting access/refresh tokens through `src/lib/secureStore.ts`
+  (Keychain/Keystore on native; AsyncStorage on web, where there's no
+  equivalent secure-at-rest API — fine for the CI web-bundle check, the
+  shipped app is native). PKCE is a public-client flow, so no client secret
+  ships in the app. Every adapter throws a typed `*Error` with a
+  user-facing message on failure (network down, auth cancelled, profile
+  private/empty, ...) rather than silently substituting simulated data under
+  the user's real identity — `connectDataPull` (`useStore.ts`) surfaces it to
+  `app/connect.tsx` instead of writing anything to the profile. The OAuth base
+  is provider-agnostic — the next adapter (ROADMAP 3B, e.g. Strava) reuses
+  `oauth/` rather than hand-rolling its own PKCE/token-exchange/refresh.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -392,6 +426,10 @@ pushes for anything due.
   Expo account yet (see "EAS Build & TestFlight" above), so it's still missing
   and `registerForPushTokenAsync` fails closed (returns `null`) rather than
   throwing. Real device tokens will start flowing once `eas init` runs.
+- **Spotify OAuth needs a redirect URI registered on the Spotify app.** Add
+  `knowable://spotify-auth-callback` as a Redirect URI in the Spotify
+  Developer Dashboard for the app behind `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, or
+  the consent screen will redirect back to a URI Spotify rejects.
 
 ## Git / workflow
 
@@ -403,11 +441,13 @@ pushes for anything due.
 
 ## Not built yet
 
-Live data-pull integrations (currently simulated in `src/data/datapull.ts`).
-Types are shaped to accommodate these. (Multi-user accounts, owner-scoped
-`auth.uid()` RLS, and connection *creation* against the real directory — NFC
-bump, Search send/accept, SMS-invite claim — are all **built**; see the
-Supabase section above.)
+Most live data-pull integrations are still simulated in `src/data/datapull.ts`
+— Goodreads, Strava, Bandsintown, Polarsteps, LinkedIn have no real adapter
+yet. Letterboxd and Spotify are real (see the "Data pull" architecture note
+above); types were already shaped to accommodate the rest. (Multi-user
+accounts, owner-scoped `auth.uid()` RLS, and connection *creation* against the
+real directory — NFC bump, Search send/accept, SMS-invite claim — are all
+**built**; see the Supabase section above.)
 
 NFC bump (`src/nfc/tapConnect.ts`) is real — it scans an actual NDEF tag via
 `react-native-nfc-manager` — and the id it reads resolves against the real
