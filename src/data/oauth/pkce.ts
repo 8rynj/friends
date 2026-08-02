@@ -1,7 +1,8 @@
 /**
  * Authorization Code + PKCE crypto helpers shared by every OAuth data-pull
- * adapter (Spec §6/§8 Integrations) — Spotify today; future adapters (Strava
- * et al., ROADMAP 3B) reuse this instead of hand-rolling their own.
+ * adapter (Spec §6/§8 Integrations) — Spotify and Strava today; future
+ * adapters (Goodreads/Bandsintown/Polarsteps/LinkedIn, ROADMAP 3B) reuse this
+ * instead of hand-rolling their own.
  */
 import * as Crypto from 'expo-crypto';
 
