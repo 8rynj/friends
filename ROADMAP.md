@@ -1,6 +1,7 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-04** (4B
+Living map of what's built and what's next. Last audited **2026-08-04** (4A
+App Store readiness pass, following 3C's Partiful commonality pass and 4B's
 crush mechanic pass) against `main`. Pair this with `CLAUDE.md` (stack,
 architecture, gotchas).
 
@@ -140,7 +141,50 @@ requirement), so Android stays the one remaining ⬜ item in 4B. `npx tsc
 crush RPC/migration/push wiring is code-complete but unverified against a
 live Supabase project with two real accounts — same "code done, needs live
 infra" shape as 1C/2A/2B.
-The next remotely-completable milestone is 4A (App Store readiness) — see
+
+4A (App Store readiness) has since landed — `PRIVACY.md` (full privacy
+policy, covers default local-only mode plus every opt-in feature: Supabase
+account/sync, push, PostHog/Sentry, Spotify/Strava OAuth, Letterboxd/
+Goodreads public-RSS pulls), linked in-app from Settings → Privacy
+(`src/lib/legal.ts`'s `PRIVACY_POLICY_URL`, satisfies Apple Guideline
+5.1.1(i)'s in-app-link requirement, not just the App Store Connect field);
+`docs/app-store/data-disclosures.md` (maps actual data collection to
+Apple's App Privacy "nutrition label" categories — explicitly clarifies the
+app never requests device Contacts permission, the SMS-invite phone number
+is manually typed); `docs/app-store/listing-copy.md` (name/subtitle/
+description/keywords/category ready to paste into App Store Connect);
+`app.json` gains `ios.config.usesNonExemptEncryption: false` (standard
+HTTPS/TLS only, skips the per-build export-compliance question). NFC's
+`NFCReaderUsageDescription` (via the `react-native-nfc-manager` plugin) was
+already present from earlier work; iOS local/push notification permission
+needs no Info.plist usage string (fixed system dialog), so nothing else was
+missing there. This pass also found and replaced the app icon/splash/
+Android-adaptive-icon/favicon assets — they were a generic icon-template
+placeholder (visible construction-guide grid/circles, unrelated to the
+product) left over from scaffolding, not a designed mark; the new set is a
+collage-style "K" wordmark (hard-offset shadow in the brand coral, cream
+face, light-blue tape accent, black background matching the existing splash
+background) rendered via the design-system's own palette
+(`src/theme/colors.ts`), at every size/format the previous placeholders
+were (`assets/icon.png` 1024×1024 RGB no-alpha, `splash-icon.png` 1024×1024
+RGBA, Android foreground/background/monochrome layers, `favicon.png`
+48×48). `docs/app-store/screenshots/` holds five App-Store-ready captures
+(1320×2868, the 6.9" display class) of Home, Connections, Connection
+profile, Icebreaker, and Your profile, taken from the web build at the
+exact iOS pixel dimensions — real app content, not mockups — with a README
+noting the same caveat as 1C/2A (no macOS/Xcode in any sandbox so far, so
+these should be recaptured from an iOS Simulator/device before final
+submission for pixel-perfect device chrome). `npx tsc --noEmit` clean
+(after reverting an unrelated `tsconfig.json` auto-rewrite `expo start`
+made to its `include`/formatting — the repo's actual tsconfig, comments and
+all, is unchanged), `npm test -- --ci` 56/56 passing, `EXPO_OFFLINE=1 CI=1
+npx expo export --platform web` bundles clean. Ships with a manual App
+Store submission checklist (see the PR) for the remaining human-only steps
+(App Store Connect data-entry, final screenshot recapture, TestFlight
+review submission).
+
+All three passes (3C, 4B's crush mechanic, 4A) are now done; the next
+remotely-completable milestone is 3B (remaining data-pull adapters) — see
 "Recommended order" below.
 
 ## Status table
@@ -161,7 +205,7 @@ The next remotely-completable milestone is 4A (App Store readiness) — see
 | 3A | Data-pull OAuth base + Spotify/Letterboxd | 🟡 | OAuth/token infra `src/data/oauth/` (`authorizationCode.ts` — Authorization Code + PKCE, provider-agnostic; `pkce.ts`; `tokenStore.ts`) + `src/lib/secureStore.ts` (Keychain/Keystore, AsyncStorage fallback on web); `src/data/adapters/letterboxd.ts` (real, public RSS, no keys needed) + `src/data/adapters/spotify.ts` (real OAuth, needs `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`); `runDataPull` (`datapull.ts`) routes to a real adapter when usable, else `simulatePull` — same `PulledData` shape, engine/UI unchanged; `app/connect.tsx` awaits the (now-async end to end) pull and surfaces adapter errors inline. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Blocked on a human:** no live Spotify developer account/Client ID in any sandbox so far to verify the OAuth round-trip end to end (same "code done, needs live credentials" shape as 1C/2A/2B/2C) — see CLAUDE.md's "Spotify OAuth needs a redirect URI" gotcha for the one-time setup. |
 | 3B | Remaining data-pull adapters | 🟡 | Strava ✅ (`src/data/adapters/strava.ts`, real OAuth, needs `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`_SECRET`); Goodreads ✅ (`src/data/adapters/goodreads.ts`, real public-shelf-RSS, no keys needed); Bandsintown/Polarsteps/LinkedIn ⬜ — can reuse `src/data/oauth/` or a public-profile-feed approach like Letterboxd/Goodreads |
 | 3C | Partiful + real mutual graph | ✅ | mutual graph ✅ (`src/engine/social.ts`); Partiful ✅ — `event` facet in `src/engine/commonality.ts`, `PulledData.partiful`/`HandleSource`/`DataPullSource`, simulated-only pull (no self-serve Partiful API; privacy-gated attended-event list) same shape as Bandsintown/Polarsteps/LinkedIn |
-| 4A | App Store readiness | ⬜ | no privacy policy / Info.plist usage strings |
+| 4A | App Store readiness | ✅ | `PRIVACY.md` + in-app link (Settings → Privacy), `docs/app-store/data-disclosures.md` (App Privacy nutrition-label mapping, clarifies no Contacts access), `docs/app-store/listing-copy.md`, `docs/app-store/screenshots/` (5 real captures at 1320×2868, README flags final recapture needs Xcode Simulator), redesigned app icon/splash/Android-adaptive-icon/favicon (previous assets were an unbranded icon-template placeholder), `app.json`'s `ios.config.usesNonExemptEncryption: false`. NFC usage string was already present; notifications need none. `npx tsc --noEmit` clean, `npm test -- --ci` 56/56, web bundle clean. Manual App Store submission checklist in the PR description. |
 | 4B | Remaining V2 + Android | 🟡 | not-interested ✅ & where-you-met ✅; crush ✅ (`toggleCrush`, `crushes` table + `toggle_crush` RPC in `supabase/migrations/0005_crush.sql`, `crush_match` push — code-complete, needs a live project + two real accounts to verify the mutual-match round trip); Android ⬜ — no Android SDK/emulator/`adb` in any sandbox so far |
 
 ## Workflow (apply to every milestone)
@@ -223,15 +267,7 @@ the OAuth round-trip + top-artists pull on a real device. Once done, flip this
 row to ✅.
 ```
 
-### 4A — App Store readiness  ⬜  *(parallel-safe, do next)*
-```
-Branch off main. Read CLAUDE.md. Goal: App Store prep — privacy policy + data
-disclosures (contacts/phone), app icon/screenshots/listing copy, and required
-Info.plist usage strings (NFC, contacts, notifications). PR to main + a checklist
-of manual submission steps.
-```
-
-### 3B — Remaining data-pull adapters  🟡  *(parallel-safe — OAuth base already ✅; Strava + Goodreads done)*
+### 3B — Remaining data-pull adapters  🟡  *(parallel-safe — OAuth base already ✅; Strava + Goodreads done — do next)*
 ```
 Branch off main. Read CLAUDE.md + ROADMAP.md's 3B row. Goal: add ONE real
 data-pull adapter — [Bandsintown | Polarsteps | LinkedIn]. Same PulledData
@@ -261,14 +297,14 @@ has it. Verify tsc + tests + web bundle. PR to main.
 
 **1C** (verify the real backend end to end, two accounts), **2A** (EAS
 build/submit), **2B** (push notifications), **2C** (analytics/crash), **3A**
-(Spotify OAuth), **3B**'s Strava adapter, and now **4B**'s crush mechanic
+(Spotify OAuth), **3B**'s Strava adapter, and **4B**'s crush mechanic
 (mutual-match RPC) are all "code done, needs a human with
 hardware/credentials/live-project access" — none available in any sandbox so
 far; 2B additionally needs 2A's `eas init` finished first. 3B's Goodreads
 adapter is the exception — it's real and needs zero setup, so it's already
-verifiable today. **3C** (Partiful commonality source + mutual graph) is now
-done too. While waiting on the other human steps, do **4A** (App Store prep,
-parallel-safe, no external blockers) next, then finish **3B**
+verifiable today. **3C** (Partiful commonality source + mutual graph) and
+**4A** (App Store prep) are now done too — both were real/done and needed
+zero human setup. What's left remotely-completable: finish **3B**
 (Bandsintown/Polarsteps/LinkedIn — check each provider's current API
 availability first, see 3B's kickoff prompt). Finish with **4B**'s Android
 build/QA pass, which needs an Android SDK/emulator/device — none available in
