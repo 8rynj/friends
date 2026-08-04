@@ -28,7 +28,8 @@ export type HandleSource =
   | 'polarsteps'
   | 'meetup'
   | 'bandsintown'
-  | 'steam';
+  | 'steam'
+  | 'partiful';
 
 export interface Handle {
   source: HandleSource;
@@ -48,7 +49,8 @@ export type DataPullSource =
   | 'strava'
   | 'bandsintown'
   | 'polarsteps'
-  | 'linkedin';
+  | 'linkedin'
+  | 'partiful';
 
 /**
  * V1.5 light-data-pull results stored on a profile. In production these come
@@ -63,6 +65,8 @@ export interface PulledData {
   bandsintown?: { artists: string[] };
   polarsteps?: { places: string[] };
   linkedin?: { title?: string; company?: string; industry?: string };
+  /** Events both attended, by title — the strongest possible commonality signal. */
+  partiful?: { events: string[] };
 }
 
 /**

@@ -38,6 +38,8 @@ function pulledSummary(source: DataPullSource, pulled: ReturnType<typeof usePull
       return pulled.polarsteps ? pulled.polarsteps.places.slice(0, 3).join(', ') : null;
     case 'linkedin':
       return pulled.linkedin ? [pulled.linkedin.title, pulled.linkedin.company].filter(Boolean).join(' · ') : null;
+    case 'partiful':
+      return pulled.partiful ? pulled.partiful.events.slice(0, 3).join(', ') : null;
   }
 }
 

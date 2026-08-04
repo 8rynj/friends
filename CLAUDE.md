@@ -120,7 +120,7 @@ server/
   `currentUser` ↔ a connection's profile (so it updates as profiles grow);
   `Connection.commonalities` is not read. It scores all facets (top hobbies,
   hobbies, bucket list, certs, life experiences, travel, shared platforms, and
-  V1.5 data-pull signals: artists/films/books/activities) and re-weights by
+  V1.5 data-pull signals: artists/films/books/activities/events) and re-weights by
   connection type (friend/professional/acquaintance/romantic).
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist

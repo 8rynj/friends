@@ -2,7 +2,7 @@
  * Commonality / icebreaker engine — the product's core value-add (Spec §3, §5B).
  *
  * Pure function that intersects two users' profiles across all facets — including
- * V1.5 light-data-pull signals (shared artists, films, books, activities) — and
+ * V1.5 light-data-pull signals (shared artists, films, books, activities, events) — and
  * returns ranked `Commonality` objects. Connection type (friend / professional /
  * acquaintance / romantic) re-weights and trims the result so icebreakers fit
  * the relationship (Spec §8 V1.5).
@@ -18,7 +18,7 @@ import { handleMeta } from '../data/mock';
 
 type Facet =
   | 'top' | 'bucket' | 'cert' | 'hobby' | 'exp' | 'travel' | 'social'
-  | 'artist' | 'genre' | 'film' | 'book' | 'activity' | 'professional';
+  | 'artist' | 'genre' | 'film' | 'book' | 'activity' | 'professional' | 'event';
 
 interface Weighted extends Commonality {
   weight: number;
@@ -56,11 +56,11 @@ function typeMultiplier(facet: Facet, type?: ConnectionType): number {
   if (type === 'professional') {
     if (facet === 'professional' || facet === 'cert') return 1.5;
     if (facet === 'book') return 1.2;
-    if (facet === 'bucket' || facet === 'artist' || facet === 'genre' || facet === 'film' || facet === 'social') return 0.5;
+    if (facet === 'bucket' || facet === 'artist' || facet === 'genre' || facet === 'film' || facet === 'social' || facet === 'event') return 0.5;
     return 1;
   }
   // romantic
-  if (facet === 'artist' || facet === 'genre' || facet === 'film' || facet === 'book' || facet === 'bucket' || facet === 'hobby' || facet === 'top' || facet === 'travel') return 1.4;
+  if (facet === 'artist' || facet === 'genre' || facet === 'film' || facet === 'book' || facet === 'bucket' || facet === 'hobby' || facet === 'top' || facet === 'travel' || facet === 'event') return 1.4;
   if (facet === 'cert' || facet === 'professional') return 0.4;
   return 1;
 }
@@ -110,6 +110,10 @@ export function computeCommonalities(
   }
   for (const act of intersect(me.pulled?.strava?.activities, them.pulled?.strava?.activities)) {
     push('activity', act, 78, 'Fitness', `You both do ${lower(act)}`, 'strava');
+  }
+  // Same real-world event attended (Partiful) — as strong a signal as it gets.
+  for (const ev of intersect(me.pulled?.partiful?.events, them.pulled?.partiful?.events)) {
+    push('event', ev, 90, 'Events', `You were both at ${ev}`, 'partiful');
   }
   // LinkedIn professional context.
   const myLi = me.pulled?.linkedin;
