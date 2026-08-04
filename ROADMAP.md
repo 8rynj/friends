@@ -1,7 +1,7 @@
 # Knowable — roadmap & build status
 
-Living map of what's built and what's next. Last audited **2026-08-02** (3B
-Strava adapter pass) against `main`. Pair this with `CLAUDE.md` (stack,
+Living map of what's built and what's next. Last audited **2026-08-04** (3B
+Goodreads adapter pass) against `main`. Pair this with `CLAUDE.md` (stack,
 architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
@@ -77,12 +77,23 @@ future confidential-client provider can reuse it too. Strava needs
 `EXPO_PUBLIC_STRAVA_CLIENT_ID` **and**
 `EXPO_PUBLIC_STRAVA_CLIENT_SECRET` (a Strava API app + Authorization Callback
 Domain — see CLAUDE.md's new Strava gotcha) before it can run end to end —
-same "code done, needs live credentials" shape as 3A/1C/2A/2B/2C — so 3B
-stays 🟡 with four sources left (Goodreads, Bandsintown, Polarsteps,
-LinkedIn). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing,
-`EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. The next
-remotely-completable milestone is 4A (App Store readiness) — see "Recommended
-order" below.
+same "code done, needs live credentials" shape as 3A/1C/2A/2B/2C.
+
+This pass adds Goodreads (`src/data/adapters/goodreads.ts`) — real, and
+unlike Strava it needs no keys or human setup at all. Amazon closed the
+Goodreads Developer API to new applicants in 2020, so like Letterboxd this
+reads a member's **public shelf RSS feeds** instead (`currently-reading` for
+"reading", `read` sorted by the member's own rating for "favorites") keyed by
+the numeric user id in their profile URL — no auth, no env vars. `app/connect.tsx`'s
+username-input card (previously Letterboxd-only) is now a small
+`USERNAME_PULL_SOURCES`-keyed pattern shared by both, since they're both
+real public-profile pulls with the same shape. So 3B stays 🟡 — Strava and
+Goodreads ✅, two sources left (Bandsintown, Polarsteps, LinkedIn) — but is
+now unblocked on live credentials for the first time, since Goodreads works
+today with zero setup. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52
+passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean.
+The next remotely-completable milestone is 4A (App Store readiness) — see
+"Recommended order" below.
 
 ## Status table
 
@@ -100,7 +111,7 @@ order" below.
 | 2B | Push notifications | 🟡 | Client: token registration/gate/deep-links unchanged; store now syncs the token to a new `push_tokens` table (`src/data/repository.ts` `savePushTokenRemote`, called from `useStore.ts`'s sync subscriber + `settings.tsx`'s sign-out). Server: `supabase/migrations/0004_push_notifications.sql` adds `push_tokens` + RLS, a `nudges.pushed_at` column, and three dispatch paths — `confirm_connection` fires on new connections, a `profiles` update trigger diffs self-reported facets old vs new and fires on new shared items, a 15-min `pg_cron` job fires due nudges — all via `pg_net` to `supabase/functions/send-push/` (new edge function; looks up the recipient's settings/tokens with the service role key, calls the Expo Push API, gates nudge/commonality on `push_nudges`/`push_updates`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on two human steps, neither available in any sandbox so far:** 2A's `eas init` (no EAS project id yet ⇒ `registerForPushTokenAsync` still fails closed, `push_tokens` stays empty regardless of the rest), and deploying the edge function + setting two Vault secrets (`edge_function_base_url`/`edge_function_service_key`) against a live Supabase project — see CLAUDE.md "Push notifications (server-driven)" for the exact commands. |
 | 2C | Analytics + crash reporting | 🟡 | `src/lib/analytics.ts` (PostHog) + `src/lib/sentry.ts` (Sentry), both `EXPO_PUBLIC_*`-gated no-ops when unset; `initSentry()` at startup, `ErrorBoundary` → `captureException`; events tracked: `connect_made` (nfc/search/sms, `useStore.ts`), `nudge_acted_on` (`respondToNudge`), `data_pull_connected` (`connectDataPull`), `onboarding_completed` (`app/onboarding/index.tsx`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** no PostHog/Sentry account in any sandbox so far to verify events actually arrive — see "Analytics + crash reporting (optional)" in CLAUDE.md for setup. |
 | 3A | Data-pull OAuth base + Spotify/Letterboxd | 🟡 | OAuth/token infra `src/data/oauth/` (`authorizationCode.ts` — Authorization Code + PKCE, provider-agnostic; `pkce.ts`; `tokenStore.ts`) + `src/lib/secureStore.ts` (Keychain/Keystore, AsyncStorage fallback on web); `src/data/adapters/letterboxd.ts` (real, public RSS, no keys needed) + `src/data/adapters/spotify.ts` (real OAuth, needs `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`); `runDataPull` (`datapull.ts`) routes to a real adapter when usable, else `simulatePull` — same `PulledData` shape, engine/UI unchanged; `app/connect.tsx` awaits the (now-async end to end) pull and surfaces adapter errors inline. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Blocked on a human:** no live Spotify developer account/Client ID in any sandbox so far to verify the OAuth round-trip end to end (same "code done, needs live credentials" shape as 1C/2A/2B/2C) — see CLAUDE.md's "Spotify OAuth needs a redirect URI" gotcha for the one-time setup. |
-| 3B | Remaining data-pull adapters | 🟡 | Strava ✅ (`src/data/adapters/strava.ts`, real OAuth, needs `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`_SECRET`); Goodreads/Bandsintown/Polarsteps/LinkedIn ⬜ — can reuse `src/data/oauth/` |
+| 3B | Remaining data-pull adapters | 🟡 | Strava ✅ (`src/data/adapters/strava.ts`, real OAuth, needs `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`_SECRET`); Goodreads ✅ (`src/data/adapters/goodreads.ts`, real public-shelf-RSS, no keys needed); Bandsintown/Polarsteps/LinkedIn ⬜ — can reuse `src/data/oauth/` or a public-profile-feed approach like Letterboxd/Goodreads |
 | 3C | Partiful + real mutual graph | 🟡 | mutual graph ✅ (`src/engine/social.ts`); Partiful ⬜ |
 | 4A | App Store readiness | ⬜ | no privacy policy / Info.plist usage strings |
 | 4B | Remaining V2 + Android | 🟡 | not-interested ✅ & where-you-met ✅; crush ⬜, Android ⬜ |
@@ -172,15 +183,17 @@ Info.plist usage strings (NFC, contacts, notifications). PR to main + a checklis
 of manual submission steps.
 ```
 
-### 3B — Remaining data-pull adapters  🟡  *(parallel-safe — OAuth base already ✅; Strava done)*
+### 3B — Remaining data-pull adapters  🟡  *(parallel-safe — OAuth base already ✅; Strava + Goodreads done)*
 ```
 Branch off main. Read CLAUDE.md + ROADMAP.md's 3B row. Goal: add ONE real
-data-pull adapter on the OAuth base in src/data/oauth/ (see 3A/Strava) —
-[Goodreads | Bandsintown | Polarsteps | LinkedIn]. Same PulledData shape, sim
-fallback. Note: Goodreads' and Bandsintown's public developer APIs are
-largely closed to new keys — check whether a public-profile/RSS approach
-(like src/data/adapters/letterboxd.ts) fits better than OAuth before assuming
-one exists to build against. Verify tsc + tests + web bundle. PR to main.
+data-pull adapter — [Bandsintown | Polarsteps | LinkedIn]. Same PulledData
+shape, sim fallback. Note: Bandsintown's public developer API is largely
+closed to new keys, and LinkedIn's OAuth only exposes basic sign-in profile
+data (not job title/company) without a partner-approved product — check each
+provider's current API availability first, and check whether a
+public-profile/RSS approach (like src/data/adapters/letterboxd.ts and
+src/data/adapters/goodreads.ts) fits better than OAuth before assuming a
+usable API exists to build against. Verify tsc + tests + web bundle. PR to main.
 ```
 
 ### 3C — Partiful integration  ⬜  *(mutual graph already ✅)*
@@ -201,11 +214,13 @@ Tell me which at the start. Verify tsc + tests + web bundle. PR to main.
 
 **1C** (verify the real backend end to end, two accounts), **2A** (EAS
 build/submit), **2B** (push notifications), **2C** (analytics/crash), **3A**
-(Spotify OAuth), and now **3B**'s Strava adapter are all "code done, needs a
+(Spotify OAuth), and **3B**'s Strava adapter are all "code done, needs a
 human with hardware/credentials/live-project access" — none available in any
-sandbox so far; 2B additionally needs 2A's `eas init` finished first. While
-waiting on those human steps, do **4A** (App Store prep, parallel-safe, no
-external blockers) next, then finish **3B** (Goodreads/Bandsintown/
-Polarsteps/LinkedIn — check each provider's current API availability first,
-see 3B's kickoff prompt) **→ 3C**. Finish with **4B** (launch/expand). Do
-shared-core items in sequence; fan out the parallel-safe ones as convenient.
+sandbox so far; 2B additionally needs 2A's `eas init` finished first. 3B's
+Goodreads adapter is the exception — it's real and needs zero setup, so it's
+already verifiable today. While waiting on the other human steps, do **4A**
+(App Store prep, parallel-safe, no external blockers) next, then finish
+**3B** (Bandsintown/Polarsteps/LinkedIn — check each provider's current API
+availability first, see 3B's kickoff prompt) **→ 3C**. Finish with **4B**
+(launch/expand). Do shared-core items in sequence; fan out the parallel-safe
+ones as convenient.

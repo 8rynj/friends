@@ -172,9 +172,13 @@ server/
 - **Data pull (`src/data/datapull.ts`, `src/data/adapters/`, `src/data/oauth/`)**
   — `runDataPull(source, input)` is what screens call; it routes to a real
   adapter when one exists and is usable, else falls back to `simulatePull`
-  (still the only path for Goodreads/Bandsintown/Polarsteps/LinkedIn).
+  (still the only path for Bandsintown/Polarsteps/LinkedIn).
   Letterboxd (`adapters/letterboxd.ts`) reads a member's public RSS diary feed
-  — no auth, since Letterboxd's real API is by-application-only. Spotify
+  — no auth, since Letterboxd's real API is by-application-only. Goodreads
+  (`adapters/goodreads.ts`) is the same shape — Amazon closed the Goodreads
+  Developer API to new applicants in 2020, so it reads a member's public
+  `currently-reading`/`read` shelf RSS feeds (keyed by the numeric user id in
+  their profile URL) instead of calling an API. Spotify
   (`adapters/spotify.ts`) and Strava (`adapters/strava.ts`) both run a real
   Authorization Code OAuth flow on the reusable base in `src/data/oauth/`:
   `authorizationCode.ts` opens the provider's consent screen via
@@ -198,8 +202,9 @@ server/
   simulated data under the user's real identity — `connectDataPull`
   (`useStore.ts`) surfaces it to `app/connect.tsx` instead of writing
   anything to the profile. The OAuth base is provider-agnostic — the
-  remaining adapters (ROADMAP 3B: Goodreads/Bandsintown/Polarsteps/LinkedIn)
-  reuse `oauth/` rather than hand-rolling their own token-exchange/refresh.
+  remaining adapters (ROADMAP 3B: Bandsintown/Polarsteps/LinkedIn) reuse
+  `oauth/` rather than hand-rolling their own token-exchange/refresh, unless
+  (like Letterboxd/Goodreads) a public-profile feed turns out to fit better.
 - **Catalog (`src/data/catalog.ts`)** holds the curated, de-duplicated hobby /
   bucket-list / certification lists + item→section lookups. Don't re-paste these;
   edit the file.
@@ -455,8 +460,8 @@ pushes for anything due.
 ## Not built yet
 
 Most live data-pull integrations are still simulated in `src/data/datapull.ts`
-— Goodreads, Bandsintown, Polarsteps, LinkedIn have no real adapter yet.
-Letterboxd, Spotify, and Strava are real (see the "Data pull" architecture
+— Bandsintown, Polarsteps, LinkedIn have no real adapter yet. Letterboxd,
+Goodreads, Spotify, and Strava are real (see the "Data pull" architecture
 note above); types were already shaped to accommodate the rest. (Multi-user
 accounts, owner-scoped `auth.uid()` RLS, and connection *creation* against the
 real directory — NFC bump, Search send/accept, SMS-invite claim — are all
