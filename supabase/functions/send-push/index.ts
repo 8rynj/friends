@@ -1,8 +1,10 @@
 // Knowable — send-push edge function (2B).
 //
 // Called by Postgres (supabase/migrations/0004_push_notifications.sql's
-// `_dispatch_push`, via pg_net, fire-and-forget) for the three server-driven
-// push kinds: 'nudge' (§5D), 'connection' (§5B/§5C), 'commonality' (§6 V1.5).
+// `_dispatch_push`, via pg_net, fire-and-forget) for the server-driven push
+// kinds: 'nudge' (§5D), 'connection' (§5B/§5C), 'commonality' (§6 V1.5), and
+// 'crush_match' (0005_crush.sql's `toggle_crush`, V2 — dispatched to BOTH
+// sides only once both have opted in, never on a one-sided crush).
 // Looks up the recipient's settings + device tokens with the service role
 // key, builds the payload, and posts to Expo's push API.
 //
@@ -23,7 +25,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 
-type PushKind = 'nudge' | 'connection' | 'commonality';
+type PushKind = 'nudge' | 'connection' | 'commonality' | 'crush_match';
 
 interface DispatchPayload {
   kind: PushKind;
@@ -88,7 +90,8 @@ Deno.serve(async (req) => {
   if (!recipient) return new Response('recipient not found', { status: 404 });
 
   // Gating matches server/sendPush.ts's doc comments: nudge → pushNudges,
-  // commonality → pushUpdates, connection → not settings-gated in-app.
+  // commonality → pushUpdates, connection/crush_match → not settings-gated
+  // in-app (both are rare, explicitly opted-in-to events, not spam).
   if (payload.kind === 'nudge' && !recipient.push_nudges) return new Response('gated', { status: 200 });
   if (payload.kind === 'commonality' && !recipient.push_updates) return new Response('gated', { status: 200 });
 
@@ -118,6 +121,10 @@ Deno.serve(async (req) => {
     case 'commonality':
       title = 'New thing in common';
       body = `${first} just added ${payload.item ?? 'something'} — you’re into that too.`;
+      break;
+    case 'crush_match':
+      title = 'It’s a match';
+      body = `You and ${first} both said yes.`;
       break;
   }
 

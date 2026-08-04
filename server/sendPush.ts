@@ -8,7 +8,7 @@
  * anywhere — serverless function, cron job, request handler — without an
  * SDK dependency.
  */
-import { commonalityPush, connectionPush, nudgePush } from '../src/notifications/copy';
+import { commonalityPush, connectionPush, crushMatchPush, nudgePush } from '../src/notifications/copy';
 import type { ConnectionType } from '../src/data/types';
 import type { PushData, PushKind, PushPayload } from '../src/notifications/types';
 
@@ -105,4 +105,9 @@ export function sendConnectionPush(tokens: string[], connectionId: string, conne
 /** A connection added something the recipient also has (§6 V1.5). Gate on the recipient's `pushUpdates` setting. */
 export function sendCommonalityPush(tokens: string[], connectionId: string, connectionName: string, item: string) {
   return sendPushNotification(tokens, commonalityPush(connectionId, connectionName, item));
+}
+
+/** Crush mechanic mutual match (V2). Not settings-gated — sent to both sides only once both have opted in. */
+export function sendCrushMatchPush(tokens: string[], connectionId: string, connectionName: string) {
+  return sendPushNotification(tokens, crushMatchPush(connectionId, connectionName));
 }

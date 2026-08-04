@@ -30,6 +30,7 @@ import {
   currentUser,
   directory,
   incomingRequestsSeed,
+  mockMutualCrushes,
   newCandidates,
   nudges as mockNudges,
   searchIgnorers,
@@ -178,6 +179,14 @@ interface AppState {
   archiveConnection: (connectionId: string) => void;
   /** Undo an archive — restores default cadence and resumes nudges (V2). */
   unarchiveConnection: (connectionId: string) => void;
+  /**
+   * Crush mechanic (V2): toggle this user's opt-in on a connection. Mutual
+   * opt-in only — against a real backend this calls a security-definer RPC
+   * that's the only thing able to see both sides' state, so neither user is
+   * notified unless both have opted in. Against the mock pool, matches
+   * `mockMutualCrushes` so the mutual-match moment is demonstrable offline.
+   */
+  toggleCrush: (connectionId: string) => Promise<void>;
   /**
    * V1.5: connect a platform and pull its signals onto the profile. Runs a
    * real adapter when one exists and `input` is supplied (e.g. a Letterboxd
@@ -361,6 +370,31 @@ export const useStore = create<AppState>()(
               : c,
           ),
         })),
+
+      toggleCrush: async (connectionId) => {
+        if (activeOwnerId) {
+          try {
+            const result = await repository.toggleCrushRemote(connectionId);
+            set((s) => ({
+              connections: s.connections.map((c) =>
+                c.id === connectionId ? { ...c, crush: result.crushed, crushMatched: result.matched } : c,
+              ),
+            }));
+          } catch (error) {
+            console.warn('[supabase] toggleCrush failed', error);
+          }
+          return;
+        }
+        // Mock pool (offline/unconfigured): the other side's opt-in isn't
+        // real, so match against the fixed mockMutualCrushes pool instead.
+        set((s) => ({
+          connections: s.connections.map((c) => {
+            if (c.id !== connectionId) return c;
+            const crush = !c.crush;
+            return { ...c, crush, crushMatched: crush && mockMutualCrushes.includes(connectionId) };
+          }),
+        }));
+      },
 
       connectDataPull: async (source, input) => {
         let result: PulledData;

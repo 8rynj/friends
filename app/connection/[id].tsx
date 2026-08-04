@@ -75,6 +75,7 @@ export default function ConnectionProfileScreen() {
   const setConnectionType = useStore((s) => s.setConnectionType);
   const archiveConnection = useStore((s) => s.archiveConnection);
   const unarchiveConnection = useStore((s) => s.unarchiveConnection);
+  const toggleCrush = useStore((s) => s.toggleCrush);
 
   if (!connection) {
     return (
@@ -239,6 +240,48 @@ export default function ConnectionProfileScreen() {
             <Text style={[type.body, { color: colors.textMutedOnLight }]}>
               Next nudge: “{nudgeCopy(connection.connectionType, user.name)}”
             </Text>
+          </View>
+
+          {/* Crush mechanic — private, mutual opt-in (V2). Neither side is
+              notified unless both opt in; a one-sided crush is only ever
+              visible here, to you. */}
+          <View style={{ gap: spacing.sm }}>
+            {connection.crushMatched ? (
+              <CollageCard background={palette.yellow} rotate="-0.3deg" taped tapeSide="left">
+                <Text style={[type.label, { color: colors.textMutedOnLight }]}>IT’S A MATCH</Text>
+                <Text style={[type.cardTitle, { color: colors.nearBlack, marginTop: 6 }]}>
+                  You and {user.name.split(' ')[0]} both said yes.
+                </Text>
+              </CollageCard>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  toggleCrush(connection.id);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  connection.crush ? `Remove crush on ${user.name}` : `I have a crush on ${user.name}`
+                }
+                accessibilityState={{ selected: !!connection.crush }}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Text
+                  style={[
+                    type.label,
+                    {
+                      color: connection.crush ? palette.orange : colors.textMutedOnLight,
+                      textDecorationLine: connection.crush ? 'none' : 'underline',
+                    },
+                  ]}
+                >
+                  {connection.crush
+                    ? `♥ Crush on ${user.name.split(' ')[0]} — only you can see this`
+                    : `Have a crush on ${user.name.split(' ')[0]}?`}
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Mutual connections — computed from the real connection graph (V2). */}

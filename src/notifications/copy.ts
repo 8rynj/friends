@@ -38,3 +38,13 @@ export function commonalityPush(connectionId: string, name: string, item: string
     data: { kind: 'commonality', connectionId },
   };
 }
+
+/** Both sides opted in via the crush mechanic (V2) — only ever sent once a match is mutual. */
+export function crushMatchPush(connectionId: string, name: string): PushPayload {
+  const first = name.split(' ')[0];
+  return {
+    title: 'It’s a match',
+    body: `You and ${first} both said yes.`,
+    data: { kind: 'crush_match', connectionId },
+  };
+}
