@@ -299,6 +299,22 @@ export async function updateConnectionMember(ownerId: string, connection: Connec
   }
 }
 
+/**
+ * Crush mechanic (V2): flips this user's opt-in on a connection via a
+ * security-definer RPC (supabase/migrations/0005_crush.sql's `toggle_crush`)
+ * — the only thing that can see both sides' `crushed` state, so a one-sided
+ * crush never leaks to the other side (RLS on `crushes` only lets a user
+ * read their own row). Returns this user's resulting state; `matched` is
+ * only true once both sides have opted in. Throws on failure.
+ */
+export async function toggleCrushRemote(connectionId: string): Promise<{ crushed: boolean; matched: boolean; matchedAt: string | null }> {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.rpc('toggle_crush', { p_connection: connectionId }).single();
+  if (error) throw error;
+  const row = data as { crushed: boolean; matched: boolean; matched_at: string | null };
+  return { crushed: row.crushed, matched: row.matched, matchedAt: row.matched_at };
+}
+
 /** Logging outreach is a multi-table invariant (contact_log insert + next_nudge advance) — goes through the RPC. */
 export async function logOutreachRemote(connectionId: string, via: string) {
   if (!supabase) return;

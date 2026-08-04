@@ -244,6 +244,30 @@ describe('NFC bump (mock pool)', () => {
   });
 });
 
+describe('toggleCrush (mock pool)', () => {
+  it('is private and one-sided by default', async () => {
+    await useStore.getState().toggleCrush('marcus');
+    const marcus = useStore.getState().connections.find((c) => c.id === 'marcus')!;
+    expect(marcus.crush).toBe(true);
+    expect(marcus.crushMatched).toBeFalsy();
+  });
+
+  it('matches when the other side already opted in (mockMutualCrushes)', async () => {
+    await useStore.getState().toggleCrush('sarah');
+    const sarah = useStore.getState().connections.find((c) => c.id === 'sarah')!;
+    expect(sarah.crush).toBe(true);
+    expect(sarah.crushMatched).toBe(true);
+  });
+
+  it('un-crushing clears both crush and any match', async () => {
+    await useStore.getState().toggleCrush('sarah');
+    await useStore.getState().toggleCrush('sarah');
+    const sarah = useStore.getState().connections.find((c) => c.id === 'sarah')!;
+    expect(sarah.crush).toBe(false);
+    expect(sarah.crushMatched).toBe(false);
+  });
+});
+
 describe('settings', () => {
   it('merges a settings patch', () => {
     useStore.getState().updateSettings({ searchable: false });
