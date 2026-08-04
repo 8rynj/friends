@@ -2,10 +2,10 @@
  * Connect — V1.5 light data pull manager (Spec §6 / §8 Integrations).
  *
  * Lists the data-pull platforms; connecting one pulls signals onto the
- * profile and feeds the commonality engine. Letterboxd runs a real
- * (unofficial, username-based) pull; Spotify runs a real OAuth pull once
- * `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is configured (falls back to the simulated
- * dev pull otherwise, same as every other source, which has no real adapter
+ * profile and feeds the commonality engine. Letterboxd and Goodreads run
+ * real (unofficial, username-based) pulls; Spotify and Strava run real OAuth
+ * pulls once their env vars are configured (falls back to the simulated dev
+ * pull otherwise, same as every other source, which has no real adapter
  * yet). Connected platforms show their pulled highlights.
  */
 import React, { useState } from 'react';
@@ -69,19 +69,26 @@ export default function ConnectScreen() {
     if (!result.ok) setPullErrors((e) => ({ ...e, [s]: result.error }));
   };
 
-  const [letterboxdUsername, setLetterboxdUsername] = useState(
-    () => handles.find((h) => h.source === 'letterboxd')?.value ?? '',
+  // Letterboxd and Goodreads are both real, unofficial, public-username-based
+  // pulls (no OAuth) — each gets its own username input + pull state below,
+  // keyed by source so the two don't share state.
+  const USERNAME_PULL_SOURCES: DataPullSource[] = ['letterboxd', 'goodreads'];
+  const [usernameInputs, setUsernameInputs] = useState<Partial<Record<DataPullSource, string>>>(() =>
+    Object.fromEntries(
+      USERNAME_PULL_SOURCES.map((s) => [s, handles.find((h) => h.source === s)?.value ?? '']),
+    ),
   );
-  const [letterboxdPulling, setLetterboxdPulling] = useState(false);
-  const [letterboxdError, setLetterboxdError] = useState<string | null>(null);
+  const [usernamePulling, setUsernamePulling] = useState<DataPullSource | null>(null);
+  const [usernameErrors, setUsernameErrors] = useState<Partial<Record<DataPullSource, string>>>({});
 
-  const pullLetterboxd = async () => {
-    if (letterboxdPulling || !letterboxdUsername.trim()) return;
-    setLetterboxdPulling(true);
-    setLetterboxdError(null);
-    const result = await connectDataPull('letterboxd', { username: letterboxdUsername });
-    setLetterboxdPulling(false);
-    if (!result.ok) setLetterboxdError(result.error);
+  const pullByUsername = async (s: DataPullSource) => {
+    const username = usernameInputs[s]?.trim();
+    if (usernamePulling || !username) return;
+    setUsernamePulling(s);
+    setUsernameErrors((e) => ({ ...e, [s]: undefined }));
+    const result = await connectDataPull(s, { username });
+    setUsernamePulling(null);
+    if (!result.ok) setUsernameErrors((e) => ({ ...e, [s]: result.error }));
   };
 
   return (
@@ -134,7 +141,7 @@ export default function ConnectScreen() {
           const summary = connected ? pulledSummary(s, pulled) : null;
           const rotate = i % 2 === 0 ? '-0.4deg' : '0.5deg';
 
-          if (s === 'letterboxd' && !connected) {
+          if (USERNAME_PULL_SOURCES.includes(s) && !connected) {
             return (
               <CollageCard key={s} background={palette.cream} rotate={rotate}>
                 <Text style={[type.cardTitle, { color: colors.nearBlack }]}>
@@ -145,10 +152,10 @@ export default function ConnectScreen() {
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <TextInput
-                    value={letterboxdUsername}
+                    value={usernameInputs[s] ?? ''}
                     onChangeText={(v) => {
-                      setLetterboxdUsername(v);
-                      setLetterboxdError(null);
+                      setUsernameInputs((inputs) => ({ ...inputs, [s]: v }));
+                      setUsernameErrors((e) => ({ ...e, [s]: undefined }));
                     }}
                     placeholder="username"
                     placeholderTextColor={colors.textMutedOnLight}
@@ -168,14 +175,14 @@ export default function ConnectScreen() {
                     }}
                   />
                   <Button
-                    label={letterboxdPulling ? 'Pulling…' : 'Pull'}
+                    label={usernamePulling === s ? 'Pulling…' : 'Pull'}
                     variant="primary"
-                    onPress={pullLetterboxd}
+                    onPress={() => pullByUsername(s)}
                   />
                 </View>
-                {letterboxdError ? (
+                {usernameErrors[s] ? (
                   <Text style={[type.body, { color: colors.nearBlack, marginTop: 6 }]}>
-                    {letterboxdError}
+                    {usernameErrors[s]}
                   </Text>
                 ) : null}
               </CollageCard>

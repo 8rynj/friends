@@ -5,19 +5,20 @@
  * and UI can be built and demoed without live platform access — used as the
  * dev fallback for every source, and still the only path for sources without
  * a real adapter yet. `runDataPull` is what screens should call: it routes to
- * a real adapter when one exists (Letterboxd always; Spotify once
- * `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is set; Strava once
- * `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`EXPO_PUBLIC_STRAVA_CLIENT_SECRET` are set —
- * see `.env.example`), otherwise it falls back to `simulatePull`. Every path
- * returns the same PulledData shape, so the engine/UI never need to know
- * which one ran.
+ * a real adapter when one exists (Letterboxd and Goodreads always, both
+ * public-RSS/username-based; Spotify once `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` is
+ * set; Strava once `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`EXPO_PUBLIC_STRAVA_CLIENT_SECRET`
+ * are set — see `.env.example`), otherwise it falls back to `simulatePull`.
+ * Every path returns the same PulledData shape, so the engine/UI never need
+ * to know which one ran.
  */
 import { DataPullSource, PulledData } from './types';
 import { pullLetterboxd, LetterboxdError } from './adapters/letterboxd';
+import { pullGoodreads, GoodreadsError } from './adapters/goodreads';
 import { pullSpotify, SpotifyError, isSpotifyConfigured } from './adapters/spotify';
 import { pullStrava, StravaError, isStravaConfigured } from './adapters/strava';
 
-export { LetterboxdError, SpotifyError, isSpotifyConfigured, StravaError, isStravaConfigured };
+export { LetterboxdError, GoodreadsError, SpotifyError, isSpotifyConfigured, StravaError, isStravaConfigured };
 
 /** Platforms that support light data pull, in display order. */
 export const DATA_PULL_SOURCES: DataPullSource[] = [
@@ -88,6 +89,9 @@ export interface DataPullInput {
 export async function runDataPull(source: DataPullSource, input?: DataPullInput): Promise<PulledData> {
   if (source === 'letterboxd' && input?.username?.trim()) {
     return pullLetterboxd(input.username);
+  }
+  if (source === 'goodreads' && input?.username?.trim()) {
+    return pullGoodreads(input.username);
   }
   if (source === 'spotify' && isSpotifyConfigured) {
     return pullSpotify();
