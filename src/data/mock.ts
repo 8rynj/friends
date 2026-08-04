@@ -28,6 +28,7 @@ export const currentUser: User = {
     { source: 'strava', value: 'Bryn J', dataPulled: true },
     { source: 'spotify', value: 'brynj', dataPulled: true },
     { source: 'polarsteps', value: 'brynj', dataPulled: true },
+    { source: 'partiful', value: 'bryn', dataPulled: true },
   ],
   pulled: {
     spotify: {
@@ -37,6 +38,7 @@ export const currentUser: User = {
     letterboxd: { favorites: ['Perfect Days', 'Past Lives', 'Aftersun'] },
     strava: { activities: ['Trail running', 'Road cycling'] },
     polarsteps: { places: ['Lisbon', 'Tokyo', 'Mexico City'] },
+    partiful: { events: ['Indie Sleaze Halloween Bash', 'Rooftop NYE'] },
   },
   profileCompletion: 92,
 };
@@ -64,6 +66,7 @@ export const handleMeta: Record<
   meetup: { label: 'Meetup', tint: '#ED1C40' },
   bandsintown: { label: 'Bandsintown', tint: '#00B4B3' },
   steam: { label: 'Steam', tint: '#1B2838' },
+  partiful: { label: 'Partiful', tint: '#7C4DFF' },
 };
 
 export const connections: Connection[] = [
@@ -188,10 +191,12 @@ export const connections: Connection[] = [
         { source: 'bandsintown', value: 'priyan', dataPulled: true },
         { source: 'instagram', value: '@priya.shoots' },
         { source: 'letterboxd', value: 'priyan', dataPulled: true },
+        { source: 'partiful', value: 'priya', dataPulled: true },
       ],
       pulled: {
         bandsintown: { artists: ['Phoebe Bridgers', 'Beach House'] },
         letterboxd: { favorites: ['Past Lives', 'Call Me By Your Name'] },
+        partiful: { events: ['Indie Sleaze Halloween Bash', 'Warehouse Rooftop Sessions'] },
       },
       recentlyAdded: ['Running'],
       connectionIds: ['sarah'],

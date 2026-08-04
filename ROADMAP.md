@@ -1,8 +1,8 @@
 # Knowable — roadmap & build status
 
 Living map of what's built and what's next. Last audited **2026-08-04** (4A
-App Store readiness pass) against `main`. Pair this with `CLAUDE.md` (stack,
-architecture, gotchas).
+App Store readiness pass, following 3C's Partiful commonality pass) against
+`main`. Pair this with `CLAUDE.md` (stack, architecture, gotchas).
 
 Legend: ✅ built · 🟡 partial · ⬜ not built
 
@@ -93,6 +93,28 @@ now unblocked on live credentials for the first time, since Goodreads works
 today with zero setup. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52
 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean.
 
+This pass lands 3C — Partiful as a commonality source, alongside the mutual-
+friends graph that already landed. `PulledData` gains `partiful: { events:
+string[] }`, `HandleSource`/`DataPullSource` gain `'partiful'`, and
+`src/engine/commonality.ts` gains an `event` facet (weight 90 — on par with a
+shared film/book, since having stood in the same room is about as strong a
+signal as it gets) that intersects each side's attended-event titles into
+"You were both at `<event>`" icebreakers, re-weighted like `film`/`social` for
+professional/romantic connection types. Partiful has no self-serve public API
+— only an unofficial reverse-engineered client exists — and its own privacy
+model keeps a member's attended-event list hidden from other users by default
+(only mutually-shared events surface, and only inside the app itself), so
+unlike Letterboxd/Goodreads this stays simulated-only (`simulatePull`'s new
+`partiful` case in `src/data/datapull.ts`), the same shape as
+Bandsintown/Polarsteps/LinkedIn — swap in a real adapter if Partiful ever
+opens one. Wired into `app/connect.tsx` (data-pull card, no code changes
+needed beyond the new switch case since the list is already source-driven)
+and `app/onboarding/index.tsx` (handle picker); demo data gives `currentUser`
+and Priya a shared "Indie Sleaze Halloween Bash" so the new icebreaker
+surfaces live in the mock data. So 3C is now fully ✅. `npx tsc --noEmit`
+clean, `npm test -- --ci` 53/53 passing (new event-facet test added),
+`EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean.
+
 4A (App Store readiness) has since landed — `PRIVACY.md` (full privacy
 policy, covers default local-only mode plus every opt-in feature: Supabase
 account/sync, push, PostHog/Sentry, Spotify/Strava OAuth, Letterboxd/
@@ -128,14 +150,14 @@ these should be recaptured from an iOS Simulator/device before final
 submission for pixel-perfect device chrome). `npx tsc --noEmit` clean
 (after reverting an unrelated `tsconfig.json` auto-rewrite `expo start`
 made to its `include`/formatting — the repo's actual tsconfig, comments and
-all, is unchanged), `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1
+all, is unchanged), `npm test -- --ci` 53/53 passing, `EXPO_OFFLINE=1 CI=1
 npx expo export --platform web` bundles clean. Ships with a manual App
 Store submission checklist (see the PR) for the remaining human-only steps
 (App Store Connect data-entry, final screenshot recapture, TestFlight
 review submission).
 
-The next remotely-completable milestones are 3B (remaining data-pull
-adapters) and 3C (Partiful) — see "Recommended order" below.
+Both passes are now done; the next remotely-completable milestone is 3B
+(remaining data-pull adapters) — see "Recommended order" below.
 
 ## Status table
 
@@ -154,8 +176,8 @@ adapters) and 3C (Partiful) — see "Recommended order" below.
 | 2C | Analytics + crash reporting | 🟡 | `src/lib/analytics.ts` (PostHog) + `src/lib/sentry.ts` (Sentry), both `EXPO_PUBLIC_*`-gated no-ops when unset; `initSentry()` at startup, `ErrorBoundary` → `captureException`; events tracked: `connect_made` (nfc/search/sms, `useStore.ts`), `nudge_acted_on` (`respondToNudge`), `data_pull_connected` (`connectDataPull`), `onboarding_completed` (`app/onboarding/index.tsx`). `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. **Blocked on a human:** no PostHog/Sentry account in any sandbox so far to verify events actually arrive — see "Analytics + crash reporting (optional)" in CLAUDE.md for setup. |
 | 3A | Data-pull OAuth base + Spotify/Letterboxd | 🟡 | OAuth/token infra `src/data/oauth/` (`authorizationCode.ts` — Authorization Code + PKCE, provider-agnostic; `pkce.ts`; `tokenStore.ts`) + `src/lib/secureStore.ts` (Keychain/Keystore, AsyncStorage fallback on web); `src/data/adapters/letterboxd.ts` (real, public RSS, no keys needed) + `src/data/adapters/spotify.ts` (real OAuth, needs `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`); `runDataPull` (`datapull.ts`) routes to a real adapter when usable, else `simulatePull` — same `PulledData` shape, engine/UI unchanged; `app/connect.tsx` awaits the (now-async end to end) pull and surfaces adapter errors inline. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52 passing, `EXPO_OFFLINE=1 CI=1 npx expo export --platform web` bundles clean. **Blocked on a human:** no live Spotify developer account/Client ID in any sandbox so far to verify the OAuth round-trip end to end (same "code done, needs live credentials" shape as 1C/2A/2B/2C) — see CLAUDE.md's "Spotify OAuth needs a redirect URI" gotcha for the one-time setup. |
 | 3B | Remaining data-pull adapters | 🟡 | Strava ✅ (`src/data/adapters/strava.ts`, real OAuth, needs `EXPO_PUBLIC_STRAVA_CLIENT_ID`/`_SECRET`); Goodreads ✅ (`src/data/adapters/goodreads.ts`, real public-shelf-RSS, no keys needed); Bandsintown/Polarsteps/LinkedIn ⬜ — can reuse `src/data/oauth/` or a public-profile-feed approach like Letterboxd/Goodreads |
-| 3C | Partiful + real mutual graph | 🟡 | mutual graph ✅ (`src/engine/social.ts`); Partiful ⬜ |
-| 4A | App Store readiness | ✅ | `PRIVACY.md` + in-app link (Settings → Privacy), `docs/app-store/data-disclosures.md` (App Privacy nutrition-label mapping, clarifies no Contacts access), `docs/app-store/listing-copy.md`, `docs/app-store/screenshots/` (5 real captures at 1320×2868, README flags final recapture needs Xcode Simulator), redesigned app icon/splash/Android-adaptive-icon/favicon (previous assets were an unbranded icon-template placeholder), `app.json`'s `ios.config.usesNonExemptEncryption: false`. NFC usage string was already present; notifications need none. `npx tsc --noEmit` clean, `npm test -- --ci` 52/52, web bundle clean. Manual App Store submission checklist in the PR description. |
+| 3C | Partiful + real mutual graph | ✅ | mutual graph ✅ (`src/engine/social.ts`); Partiful ✅ — `event` facet in `src/engine/commonality.ts`, `PulledData.partiful`/`HandleSource`/`DataPullSource`, simulated-only pull (no self-serve Partiful API; privacy-gated attended-event list) same shape as Bandsintown/Polarsteps/LinkedIn |
+| 4A | App Store readiness | ✅ | `PRIVACY.md` + in-app link (Settings → Privacy), `docs/app-store/data-disclosures.md` (App Privacy nutrition-label mapping, clarifies no Contacts access), `docs/app-store/listing-copy.md`, `docs/app-store/screenshots/` (5 real captures at 1320×2868, README flags final recapture needs Xcode Simulator), redesigned app icon/splash/Android-adaptive-icon/favicon (previous assets were an unbranded icon-template placeholder), `app.json`'s `ios.config.usesNonExemptEncryption: false`. NFC usage string was already present; notifications need none. `npx tsc --noEmit` clean, `npm test -- --ci` 53/53, web bundle clean. Manual App Store submission checklist in the PR description. |
 | 4B | Remaining V2 + Android | 🟡 | not-interested ✅ & where-you-met ✅; crush ⬜, Android ⬜ |
 
 ## Workflow (apply to every milestone)
@@ -230,13 +252,6 @@ src/data/adapters/goodreads.ts) fits better than OAuth before assuming a
 usable API exists to build against. Verify tsc + tests + web bundle. PR to main.
 ```
 
-### 3C — Partiful integration  ⬜  *(mutual graph already ✅)*
-```
-Branch off main. Read CLAUDE.md. Goal: surface shared Partiful events as a
-commonality source, feeding the existing engine. (Real mutual-friends graph is
-already built in src/engine/social.ts.) Verify tsc + tests + web bundle. PR to main.
-```
-
 ### 4B — Crush mechanic / Android  🟡
 ```
 Branch off main. Read CLAUDE.md. Goal: pick ONE — (a) crush mechanic (mutual
@@ -251,9 +266,10 @@ build/submit), **2B** (push notifications), **2C** (analytics/crash), **3A**
 (Spotify OAuth), and **3B**'s Strava adapter are all "code done, needs a
 human with hardware/credentials/live-project access" — none available in any
 sandbox so far; 2B additionally needs 2A's `eas init` finished first. 3B's
-Goodreads adapter and **4A** (App Store prep) are the exceptions — both are
-real/done and needed zero human setup, so they're already finished. While
-waiting on the other human steps, finish **3B** (Bandsintown/Polarsteps/
+Goodreads adapter is the exception — it's real and needs zero setup, so it's
+already verifiable today. **3C** (Partiful commonality source + mutual graph)
+and **4A** (App Store prep) are now done too — both were real/done and
+needed zero human setup. What's left: finish **3B** (Bandsintown/Polarsteps/
 LinkedIn — check each provider's current API availability first, see 3B's
-kickoff prompt) **→ 3C**. Finish with **4B** (launch/expand). Do shared-core
-items in sequence; fan out the parallel-safe ones as convenient.
+kickoff prompt), then **4B** (launch/expand). Do shared-core items in
+sequence; fan out the parallel-safe ones as convenient.

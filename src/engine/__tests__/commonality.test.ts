@@ -138,6 +138,15 @@ describe('computeCommonalities', () => {
       expect(c.title).toBe('You both work at Aperture');
       expect(c.source).toBe('linkedin');
     });
+
+    it('matches a shared Partiful event', () => {
+      const me = user({ pulled: { partiful: { events: ['Indie Sleaze Halloween Bash'] } } });
+      const them = user({ pulled: { partiful: { events: ['indie sleaze halloween bash'] } } });
+      const [c] = computeCommonalities(me, them);
+      expect(c.title).toBe('You were both at Indie Sleaze Halloween Bash');
+      expect(c.category).toBe('Events');
+      expect(c.source).toBe('partiful');
+    });
   });
 });
 
