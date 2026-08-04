@@ -213,6 +213,16 @@ export const connections: Connection[] = [
   },
 ];
 
+/**
+ * Crush mechanic (V2, offline/mock pool only): connection ids who, in this
+ * demo data, have already opted in on the current user. A real backend
+ * determines a mutual match server-side (see `toggle_crush` in
+ * supabase/migrations/0005_crush.sql) since neither side's raw crush state is
+ * ever readable by the other — this mock pool exists purely so the "It's a
+ * match" moment is demonstrable without a live second account.
+ */
+export const mockMutualCrushes: string[] = ['sarah'];
+
 /** Lookup helper used by the connection profile route. */
 export function getConnection(id: string): Connection | undefined {
   return connections.find((c) => c.id === id);

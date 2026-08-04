@@ -195,6 +195,18 @@ export interface Connection {
    * (not deleted) and reversible from the Archived view.
    */
   archived?: boolean;
+  /**
+   * Crush mechanic (V2): this user has opted in on this connection. Private —
+   * only visible to the user who set it, never surfaced to the other side by
+   * itself (see `crushMatched`).
+   */
+  crush?: boolean;
+  /**
+   * Both sides have opted in via `crush`, forming a mutual match. Only ever
+   * true when it's true for both connection members — neither side learns
+   * anything about a one-sided crush.
+   */
+  crushMatched?: boolean;
 }
 
 /** Pending connection tied to a phone number, 30-day expiry (Spec §5C, §8). */

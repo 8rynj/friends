@@ -6,8 +6,8 @@
  * profile it's about (§8, Not built yet: push notifications).
  */
 
-/** The three server-driven push events (Spec §5D nudges, §5B connections, §6 V1.5 commonalities). */
-export type PushKind = 'nudge' | 'connection' | 'commonality';
+/** The server-driven push events (Spec §5D nudges, §5B connections, §6 V1.5 commonalities, V2 crush matches). */
+export type PushKind = 'nudge' | 'connection' | 'commonality' | 'crush_match';
 
 export interface PushData {
   kind: PushKind;
