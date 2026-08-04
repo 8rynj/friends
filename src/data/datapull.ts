@@ -29,6 +29,7 @@ export const DATA_PULL_SOURCES: DataPullSource[] = [
   'bandsintown',
   'polarsteps',
   'linkedin',
+  'partiful',
 ];
 
 /** Human label for what each pull surfaces (shown in the connect UI). */
@@ -40,6 +41,7 @@ export const dataPullBlurb: Record<DataPullSource, string> = {
   bandsintown: 'Upcoming shows & artists',
   polarsteps: 'Places visited',
   linkedin: 'Professional context',
+  partiful: 'Events you’ve been to',
 };
 
 /**
@@ -72,6 +74,8 @@ export function simulatePull(source: DataPullSource): PulledData {
       return { polarsteps: { places: ['Lisbon', 'Tokyo', 'Mexico City'] } };
     case 'linkedin':
       return { linkedin: { title: 'Product Designer', company: 'Aperture', industry: 'Design' } };
+    case 'partiful':
+      return { partiful: { events: ['Indie Sleaze Halloween Bash', 'Rooftop NYE'] } };
   }
 }
 

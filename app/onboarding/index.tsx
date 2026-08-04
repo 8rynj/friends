@@ -36,7 +36,7 @@ import { trackEvent } from '../../src/lib/analytics';
 const MAX_TOP = 5;
 const HANDLE_OPTIONS: HandleSource[] = [
   'instagram', 'spotify', 'letterboxd', 'strava',
-  'linkedin', 'goodreads', 'snapchat', 'bandsintown',
+  'linkedin', 'goodreads', 'snapchat', 'bandsintown', 'partiful',
 ];
 const TOTAL_STEPS = 4;
 
