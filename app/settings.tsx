@@ -7,13 +7,14 @@
  * Account: signed-in identity + reset (mock sign-out).
  */
 import React from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Button, CollageCard, OutlineText, Toggle } from '../src/components';
 import { border, colors, palette, spacing, type } from '../src/theme';
 import { NudgeCadence } from '../src/data/types';
 import { signOutPhone } from '../src/lib/auth';
+import { PRIVACY_POLICY_URL } from '../src/lib/legal';
 import { savePushTokenRemote } from '../src/data/repository';
 import { Settings, stopSupabaseSync, useStore } from '../src/store/useStore';
 import { requestNudgePermissions } from '../src/engine/notifications';
@@ -134,6 +135,14 @@ export default function SettingsScreen() {
             value={settings.searchable}
             onChange={(v) => set({ searchable: v })}
           />
+          <Pressable
+            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="link"
+            accessibilityLabel="Read the Knowable privacy policy"
+          >
+            <Text style={[type.label, { color: colors.navy }]}>Privacy policy ↗</Text>
+          </Pressable>
         </Section>
 
         {/* Notifications */}
