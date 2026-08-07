@@ -14,8 +14,20 @@ import { Platform } from 'react-native';
 
 type NfcModule = typeof import('react-native-nfc-manager');
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const nfc: NfcModule | null = Platform.OS === 'web' ? null : require('react-native-nfc-manager');
+// The native module is absent on web AND in Expo Go (it needs a dev-client /
+// prebuilt build). Require it lazily inside a try/catch so a missing module
+// resolves to null — otherwise touching it at import time hard-crashes the
+// whole app in Expo Go ("tried to access a native module that doesn't exist")
+// instead of letting NFC degrade to an in-app "unavailable" state.
+let nfc: NfcModule | null = null;
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    nfc = require('react-native-nfc-manager');
+  } catch {
+    nfc = null;
+  }
+}
 
 const CONNECT_PREFIX = 'knowable:';
 
