@@ -23,9 +23,7 @@ import {
   Avatar,
   Button,
   CollageCard,
-  HalftoneEye,
   OutlineText,
-  PaperScrap,
   Pill,
   RippedEdge,
 } from '../src/components';
@@ -92,9 +90,6 @@ export default function IcebreakerScreen() {
           overflow: 'hidden',
         }}
       >
-        <HalftoneEye size={80} top={insets.top + 10} left={-8} opacity={0.07} />
-        <PaperScrap top={insets.top + 18} right={24} size={20} color={palette.paperYellow} rotate="16deg" />
-
         <Pill label="Just connected" variant="connected" />
 
         {/* Two avatars colliding with a bump icon between. */}
