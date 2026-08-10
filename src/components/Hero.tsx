@@ -11,9 +11,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { border, colors, palette, type } from '../theme';
 import { Avatar } from './Avatar';
-import { HalftoneEye } from './HalftoneEye';
 import { OutlineText } from './OutlineText';
-import { PaperScrap } from './PaperScrap';
 import { Pill } from './Pill';
 import { RippedEdge } from './RippedEdge';
 
@@ -67,13 +65,6 @@ export function Hero({
           overflow: 'hidden',
         }}
       >
-        {/* Subtle halftone texture + paper scraps (§5). Kept in the empty
-            upper-center band so they never sit over the eyebrow, name, avatar,
-            back button or connected pill (§9). */}
-        <HalftoneEye size={88} top={insets.top + 4} right={-12} opacity={0.07} />
-        <PaperScrap top={insets.top + 16} right={128} size={22} color={palette.orange} rotate="-12deg" />
-        <PaperScrap top={insets.top + 44} right={156} size={14} color={palette.paperYellow} rotate="18deg" />
-
         {/* Back button — circular, cream, near-black border + shadow (§5). */}
         {onBack && (
           <Pressable

@@ -20,7 +20,6 @@ import {
   Avatar,
   Button,
   CatalogPicker,
-  HalftoneEye,
   HobbyChip,
   OutlineText,
   Pill,
@@ -99,8 +98,6 @@ export default function OnboardingScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBgDark }}>
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: spacing.screen, flex: 1 }}>
-        <HalftoneEye size={90} bottom={insets.bottom + 80} right={-16} opacity={0.09} />
-
         {/* Progress + step label. */}
         <ProgressBar percent={percent} />
         <Text style={[type.label, { color: palette.yellow, marginTop: spacing.lg }]}>

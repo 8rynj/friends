@@ -19,10 +19,8 @@ import {
   CollageCard,
   EmptyState,
   Fab,
-  HalftoneEye,
   Marquee,
   OutlineText,
-  PaperScrap,
   Pill,
   ProfileQuests,
 } from '../../src/components';
@@ -108,10 +106,6 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Decorative layer (never over text). */}
-        <PaperScrap top={-2} right={4} size={22} color={palette.paperYellow} rotate="14deg" />
-        <HalftoneEye size={70} bottom={40} left={-12} opacity={0.06} />
-
         {/* Stat pills — tilted, alternating directions (§8). */}
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' }}>
           <View style={{ transform: [{ rotate: '-2deg' }] }}>
