@@ -2,8 +2,6 @@ export * from './HardShadow';
 export * from './CollageCard';
 export * from './Tape';
 export * from './RippedEdge';
-export * from './PaperScrap';
-export * from './HalftoneEye';
 export * from './Sticker';
 export * from './Avatar';
 export * from './Pill';
