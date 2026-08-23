@@ -28,7 +28,8 @@ import {
 import { border, colors, fonts, palette, spacing, type } from '../../src/theme';
 import { handleMeta } from '../../src/data/mock';
 import { hobbyCatalog } from '../../src/data/catalog';
-import { HandleSource } from '../../src/data/types';
+import { dataPullBlurb } from '../../src/data/datapull';
+import { DataPullSource, HandleSource } from '../../src/data/types';
 import { useStore } from '../../src/store/useStore';
 import { trackEvent } from '../../src/lib/analytics';
 
@@ -37,6 +38,8 @@ const HANDLE_OPTIONS: HandleSource[] = [
   'instagram', 'spotify', 'letterboxd', 'strava',
   'linkedin', 'goodreads', 'snapchat', 'bandsintown', 'partiful',
 ];
+// Real, no-auth username pulls you can run right here in onboarding.
+const PULL_SOURCES: DataPullSource[] = ['letterboxd', 'goodreads'];
 const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
@@ -44,6 +47,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const user = useStore((s) => s.user);
   const completeProfile = useStore((s) => s.completeProfile);
+  const connectDataPull = useStore((s) => s.connectDataPull);
 
   const [step, setStep] = useState(0);
   // Prefill from the existing profile so this doubles as profile editing.
@@ -77,6 +81,31 @@ export default function OnboardingScreen() {
 
   const toggleHandle = (s: HandleSource) =>
     setHandles((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  // Real username-based data pulls (Letterboxd / Goodreads) — run right here so
+  // onboarding can scrape and auto-match immediately. On success, ensure the
+  // handle is selected so finish() persists the pulled value (connectDataPull
+  // has already written pulled data + dataPulled onto the store's user).
+  const [pullInputs, setPullInputs] = useState<Partial<Record<DataPullSource, string>>>({});
+  const [pulling, setPulling] = useState<DataPullSource | null>(null);
+  const [pullErrors, setPullErrors] = useState<Partial<Record<DataPullSource, string>>>({});
+
+  const isPulled = (s: DataPullSource) =>
+    user.handles.some((h) => h.source === s && h.dataPulled);
+
+  const pullByUsername = async (s: DataPullSource) => {
+    const username = pullInputs[s]?.trim();
+    if (pulling || !username) return;
+    setPulling(s);
+    setPullErrors((e) => ({ ...e, [s]: undefined }));
+    const result = await connectDataPull(s, { username });
+    setPulling(null);
+    if (result.ok) {
+      setHandles((prev) => (prev.includes(s) ? prev : [...prev, s]));
+    } else {
+      setPullErrors((e) => ({ ...e, [s]: result.error }));
+    }
+  };
 
   const finish = () => {
     // Keep top hobbies a subset of selected hobbies.
@@ -214,7 +243,89 @@ export default function OnboardingScreen() {
                 </OutlineText>
               </View>
               <Text style={[type.body, { color: colors.textMutedOnDark }]}>
-                Share handles so the people you meet find more in common with you.
+                Connect an account to auto-match on what you actually love — or just
+                share your handles.
+              </Text>
+
+              {/* Real, no-auth pulls you can run right now (Letterboxd / Goodreads). */}
+              <View style={{ gap: spacing.sm, marginTop: 4 }}>
+                {PULL_SOURCES.map((s) => {
+                  const pulled = isPulled(s);
+                  return (
+                    <View
+                      key={s}
+                      style={{
+                        borderWidth: border.small,
+                        borderColor: 'rgba(242,240,210,0.25)',
+                        borderRadius: 14,
+                        padding: 12,
+                        gap: 8,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: palette.offWhite }}>
+                          {handleMeta[s].label}
+                        </Text>
+                        {pulled && <Pill label="Pulled ★" variant="connected" />}
+                      </View>
+                      {!pulled && (
+                        <>
+                          <Text style={[type.body, { color: colors.textMutedOnDark }]}>
+                            {dataPullBlurb[s]} — enter your public username
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                            <TextInput
+                              value={pullInputs[s] ?? ''}
+                              onChangeText={(v) => {
+                                setPullInputs((i) => ({ ...i, [s]: v }));
+                                setPullErrors((e) => ({ ...e, [s]: undefined }));
+                              }}
+                              placeholder={s === 'goodreads' ? 'user id (from profile URL)' : 'username'}
+                              placeholderTextColor="rgba(242,240,210,0.4)"
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              style={{
+                                flex: 1,
+                                borderWidth: border.small,
+                                borderColor: 'rgba(242,240,210,0.3)',
+                                borderRadius: 10,
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                color: palette.offWhite,
+                                fontFamily: type.body.fontFamily,
+                                fontSize: type.body.fontSize,
+                              }}
+                            />
+                            <Pressable
+                              onPress={() => pullByUsername(s)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Pull ${handleMeta[s].label}`}
+                              style={{
+                                backgroundColor: palette.yellow,
+                                borderRadius: 100,
+                                borderWidth: border.small,
+                                borderColor: colors.border,
+                                paddingVertical: 10,
+                                paddingHorizontal: 18,
+                              }}
+                            >
+                              <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.nearBlack }}>
+                                {pulling === s ? 'Pulling…' : 'Pull'}
+                              </Text>
+                            </Pressable>
+                          </View>
+                          {pullErrors[s] ? (
+                            <Text style={[type.body, { color: palette.yellow }]}>{pullErrors[s]}</Text>
+                          ) : null}
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              <Text style={[type.label, { color: colors.textMutedOnDark, marginTop: spacing.sm }]}>
+                Or just add your handles
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                 {HANDLE_OPTIONS.map((s) => (
