@@ -9,7 +9,7 @@
  * yet). Connected platforms show their pulled highlights.
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Button, CollageCard, OutlineText, Pill, SkeletonBlock } from '../src/components';
@@ -58,6 +58,12 @@ export default function ConnectScreen() {
   const isConnected = (s: DataPullSource) =>
     handles.some((h) => h.source === s && h.dataPulled);
 
+  // A private/empty/unreachable account pulls nothing — popup on native for
+  // prominence (inline text still covers web, where RN Alert is unreliable).
+  const notifyNoData = (s: DataPullSource, message: string) => {
+    if (Platform.OS !== 'web') Alert.alert(`No data shared from ${handleMeta[s].label}`, message);
+  };
+
   // Spotify runs a real OAuth pull when configured (opens the system browser
   // for consent); everything else but Letterboxd still runs the simulated dev
   // fallback. Either way `connectDataPull` is async, so await it and surface
@@ -68,7 +74,10 @@ export default function ConnectScreen() {
     setPullErrors((e) => ({ ...e, [s]: undefined }));
     const result = await connectDataPull(s);
     setPulling(null);
-    if (!result.ok) setPullErrors((e) => ({ ...e, [s]: result.error }));
+    if (!result.ok) {
+      setPullErrors((e) => ({ ...e, [s]: result.error }));
+      notifyNoData(s, result.error);
+    }
   };
 
   // Letterboxd and Goodreads are both real, unofficial, public-username-based
@@ -90,7 +99,10 @@ export default function ConnectScreen() {
     setUsernameErrors((e) => ({ ...e, [s]: undefined }));
     const result = await connectDataPull(s, { username });
     setUsernamePulling(null);
-    if (!result.ok) setUsernameErrors((e) => ({ ...e, [s]: result.error }));
+    if (!result.ok) {
+      setUsernameErrors((e) => ({ ...e, [s]: result.error }));
+      notifyNoData(s, result.error);
+    }
   };
 
   return (

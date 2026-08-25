@@ -11,7 +11,7 @@
  * Persists name / hobbies / topHobbies / handles to the store on finish.
  */
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -93,6 +93,13 @@ export default function OnboardingScreen() {
   const isPulled = (s: DataPullSource) =>
     user.handles.some((h) => h.source === s && h.dataPulled);
 
+  // A private/empty/unreachable account pulls nothing — surface it clearly.
+  // Popup on native for prominence; the inline text covers web (RN Alert there
+  // is unreliable).
+  const notifyNoData = (label: string, message: string) => {
+    if (Platform.OS !== 'web') Alert.alert(`No data shared from ${label}`, message);
+  };
+
   const pullByUsername = async (s: DataPullSource) => {
     const username = pullInputs[s]?.trim();
     if (pulling || !username) return;
@@ -104,6 +111,7 @@ export default function OnboardingScreen() {
       setHandles((prev) => (prev.includes(s) ? prev : [...prev, s]));
     } else {
       setPullErrors((e) => ({ ...e, [s]: result.error }));
+      notifyNoData(handleMeta[s].label, result.error);
     }
   };
 
@@ -120,6 +128,7 @@ export default function OnboardingScreen() {
       setHandles((prev) => (prev.includes(s) ? prev : [...prev, s]));
     } else {
       setPullErrors((e) => ({ ...e, [s]: result.error }));
+      notifyNoData(handleMeta[s].label, result.error);
     }
   };
 
