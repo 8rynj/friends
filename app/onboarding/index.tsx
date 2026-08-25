@@ -28,7 +28,7 @@ import {
 import { border, colors, fonts, palette, spacing, type } from '../../src/theme';
 import { handleMeta } from '../../src/data/mock';
 import { hobbyCatalog } from '../../src/data/catalog';
-import { dataPullBlurb } from '../../src/data/datapull';
+import { DATA_PULL_SOURCES, dataPullBlurb } from '../../src/data/datapull';
 import { DataPullSource, HandleSource } from '../../src/data/types';
 import { useStore } from '../../src/store/useStore';
 import { trackEvent } from '../../src/lib/analytics';
@@ -99,6 +99,22 @@ export default function OnboardingScreen() {
     setPulling(s);
     setPullErrors((e) => ({ ...e, [s]: undefined }));
     const result = await connectDataPull(s, { username });
+    setPulling(null);
+    if (result.ok) {
+      setHandles((prev) => (prev.includes(s) ? prev : [...prev, s]));
+    } else {
+      setPullErrors((e) => ({ ...e, [s]: result.error }));
+    }
+  };
+
+  // Other integrations connect with one tap (Spotify/Strava run real OAuth when
+  // their keys are set; the rest run the simulated pull) — same handle-persist
+  // rule as pullByUsername.
+  const connectSource = async (s: DataPullSource) => {
+    if (pulling) return;
+    setPulling(s);
+    setPullErrors((e) => ({ ...e, [s]: undefined }));
+    const result = await connectDataPull(s);
     setPulling(null);
     if (result.ok) {
       setHandles((prev) => (prev.includes(s) ? prev : [...prev, s]));
@@ -247,10 +263,13 @@ export default function OnboardingScreen() {
                 share your handles.
               </Text>
 
-              {/* Real, no-auth pulls you can run right now (Letterboxd / Goodreads). */}
+              {/* Every integration, connectable right here. Letterboxd/Goodreads
+                  are real public-username pulls; the rest connect with one tap
+                  (Spotify/Strava real when keyed, others simulated). */}
               <View style={{ gap: spacing.sm, marginTop: 4 }}>
-                {PULL_SOURCES.map((s) => {
+                {DATA_PULL_SOURCES.map((s) => {
                   const pulled = isPulled(s);
+                  const isUsername = PULL_SOURCES.includes(s);
                   return (
                     <View
                       key={s}
@@ -268,7 +287,7 @@ export default function OnboardingScreen() {
                         </Text>
                         {pulled && <Pill label="Pulled ★" variant="connected" />}
                       </View>
-                      {!pulled && (
+                      {!pulled && isUsername && (
                         <>
                           <Text style={[type.body, { color: colors.textMutedOnDark }]}>
                             {dataPullBlurb[s]} — enter your public username
@@ -319,6 +338,35 @@ export default function OnboardingScreen() {
                           ) : null}
                         </>
                       )}
+                      {!pulled && !isUsername && (
+                        <>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                            <Text style={[type.body, { color: colors.textMutedOnDark, flex: 1 }]}>
+                              {dataPullBlurb[s]}
+                            </Text>
+                            <Pressable
+                              onPress={() => connectSource(s)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Connect ${handleMeta[s].label}`}
+                              style={{
+                                backgroundColor: palette.yellow,
+                                borderRadius: 100,
+                                borderWidth: border.small,
+                                borderColor: colors.border,
+                                paddingVertical: 10,
+                                paddingHorizontal: 18,
+                              }}
+                            >
+                              <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.nearBlack }}>
+                                {pulling === s ? 'Connecting…' : 'Connect'}
+                              </Text>
+                            </Pressable>
+                          </View>
+                          {pullErrors[s] ? (
+                            <Text style={[type.body, { color: palette.yellow }]}>{pullErrors[s]}</Text>
+                          ) : null}
+                        </>
+                      )}
                     </View>
                   );
                 })}
@@ -328,7 +376,9 @@ export default function OnboardingScreen() {
                 Or just add your handles
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                {HANDLE_OPTIONS.map((s) => (
+                {HANDLE_OPTIONS.filter(
+                  (s) => !(DATA_PULL_SOURCES as string[]).includes(s),
+                ).map((s) => (
                   <Pressable
                     key={s}
                     onPress={() => {
