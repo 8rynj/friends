@@ -2,6 +2,10 @@
  * HobbyChip — Design Guidelines §8 (Onboarding). Selectable pill chip.
  * Unselected = transparent with a muted border; selected = a brand color
  * (navy / yellow / orange) with a solid border. Functional element — no tilt.
+ *
+ * On dark backgrounds the selected border stays light (offWhite) rather than
+ * near-black, so the outline doesn't vanish into the dark background when a chip
+ * fills in — it reads as "filled outline", not "outline removed".
  */
 import React from 'react';
 import { Platform, Pressable, Text } from 'react-native';
@@ -49,7 +53,7 @@ export function HobbyChip({
         backgroundColor: selected ? selectedColor : 'transparent',
         borderRadius: radii.pill,
         borderWidth: border.small,
-        borderColor: selected ? colors.border : unselectedBorder,
+        borderColor: selected ? (onDark ? palette.offWhite : colors.border) : unselectedBorder,
         paddingVertical: 10,
         paddingHorizontal: 16,
       }}
