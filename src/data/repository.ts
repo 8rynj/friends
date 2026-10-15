@@ -1,8 +1,8 @@
 /**
  * Supabase repository — the data layer behind `useStore`, targeting the real
  * multi-user schema in supabase/migrations/ (profiles, connections,
- * connection_members, contact_log, handles, nudges, pending_connections,
- * requests).
+ * connection_members, connection_notes, contact_log, handles, nudges,
+ * pending_connections, requests).
  *
  * Unlike the old single-tenant design, sync here is scoped to a real
  * `auth.uid()` — see `useStore.ts`'s `startSupabaseSync`/`stopSupabaseSync`,
@@ -34,7 +34,6 @@ import {
   ContactLogEntry,
   Handle,
   IncomingRequest,
-  MetContext,
   Nudge,
   NudgeCadence,
   OutgoingRequest,
@@ -206,7 +205,11 @@ interface MemberRow {
 interface ConnectionRow {
   id: string;
   method: Connection['method'];
-  met_context: MetContext | null;
+}
+
+interface NoteRow {
+  connection_id: string;
+  body: string;
 }
 
 interface ContactLogRow {
@@ -234,15 +237,20 @@ export async function loadConnections(ownerId: string, onlyConnectionId?: string
     const connectionIds = memberRows.map((m) => m.connection_id);
     const otherIds = memberRows.map((m) => m.other_id);
 
-    const [connsRes, profilesRes, logRes] = await Promise.all([
-      supabase.from('connections').select('id, method, met_context').in('id', connectionIds),
+    const [connsRes, profilesRes, logRes, notesRes] = await Promise.all([
+      supabase.from('connections').select('id, method').in('id', connectionIds),
       supabase.from('profiles').select('*').in('id', otherIds),
       supabase.from('contact_log').select('id, connection_id, what, created_at')
         .eq('user_id', ownerId).in('connection_id', connectionIds),
+      // Private notes — owner-only by RLS; the explicit owner filter is belt-and-braces.
+      supabase.from('connection_notes').select('connection_id, body')
+        .eq('owner_id', ownerId).in('connection_id', connectionIds),
     ]);
     if (connsRes.error) throw connsRes.error;
     if (profilesRes.error) throw profilesRes.error;
     if (logRes.error) throw logRes.error;
+    if (notesRes.error) throw notesRes.error;
+    const notesByConnection = new Map((notesRes.data as NoteRow[]).map((n) => [n.connection_id, n.body]));
 
     const connById = new Map((connsRes.data as ConnectionRow[]).map((c) => [c.id, c]));
     const profileById = new Map((profilesRes.data as ProfileRow[]).map((p) => [p.id, p]));
@@ -264,7 +272,7 @@ export async function loadConnections(ownerId: string, onlyConnectionId?: string
           user: { ...rowToUser(profile), profileCompletion: 0 },
           method: conn.method,
           connectionType: m.connection_type,
-          metContext: conn.met_context ?? undefined,
+          notes: notesByConnection.get(m.connection_id) || undefined,
           sharedContactInfo: (m.shares ?? []) as Connection['sharedContactInfo'],
           nudgeCadence: m.nudge_freq,
           lastContacted: m.last_contacted ? m.last_contacted.slice(0, 10) : null,
@@ -296,6 +304,31 @@ export async function updateConnectionMember(ownerId: string, connection: Connec
     if (error) logSyncError('connection_members update', error);
   } catch (error) {
     logSyncError('connection_members update', error);
+  }
+}
+
+/**
+ * Saves this user's private notes on a connection (`connection_notes`, RLS
+ * owner-only — the other side can never read them). Empty notes delete the row.
+ */
+export async function saveConnectionNotesRemote(ownerId: string, connectionId: string, body: string) {
+  if (!supabase) return;
+  try {
+    const { error } = body.trim()
+      ? await supabase
+          .from('connection_notes')
+          .upsert(
+            { connection_id: connectionId, owner_id: ownerId, body, updated_at: new Date().toISOString() },
+            { onConflict: 'connection_id,owner_id' },
+          )
+      : await supabase
+          .from('connection_notes')
+          .delete()
+          .eq('connection_id', connectionId)
+          .eq('owner_id', ownerId);
+    if (error) logSyncError('connection_notes save', error);
+  } catch (error) {
+    logSyncError('connection_notes save', error);
   }
 }
 
@@ -390,7 +423,6 @@ interface PendingRow {
   name: string | null;
   expires_at: string;
   created_at: string;
-  met_context: MetContext | null;
   token: string;
 }
 
@@ -399,7 +431,7 @@ export async function loadPendingConnections(ownerId: string): Promise<PendingCo
   try {
     const { data, error } = await supabase
       .from('pending_connections')
-      .select('id, invitee_phone, name, expires_at, created_at, met_context, token')
+      .select('id, invitee_phone, name, expires_at, created_at, token')
       .eq('inviter_id', ownerId)
       .is('claimed_by', null);
     if (error) throw error;
@@ -410,7 +442,6 @@ export async function loadPendingConnections(ownerId: string): Promise<PendingCo
       createdAt: row.created_at.slice(0, 10),
       expiresAt: row.expires_at.slice(0, 10),
       method: 'sms',
-      metContext: row.met_context ?? undefined,
       token: row.token,
     }));
   } catch (error) {
@@ -430,7 +461,6 @@ export async function createPendingInviteRemote(ownerId: string, pending: Pendin
       name: pending.name ?? null,
       token: pending.token,
       expires_at: pending.expiresAt,
-      met_context: pending.metContext ?? null,
     });
     if (error) logSyncError('pending_connections insert', error);
   } catch (error) {
@@ -550,13 +580,12 @@ export async function getProfilePreview(id: string): Promise<ProfilePreview | nu
 }
 
 /** Creates a connection directly (NFC bump — consent is already established by the physical tap, Spec §5B Method 1). Throws on failure. */
-export async function confirmConnectionRemote(otherId: string, method: 'nfc' | 'search' = 'nfc', metContext?: MetContext): Promise<string> {
+export async function confirmConnectionRemote(otherId: string, method: 'nfc' | 'search' = 'nfc'): Promise<string> {
   if (!supabase) throw new Error('Supabase is not configured');
   const { data, error } = await supabase.rpc('confirm_connection', {
     other: otherId,
     my_shares: [],
     p_method: method,
-    p_met_context: metContext ?? null,
   });
   if (error) throw error;
   return data as string;
@@ -568,7 +597,7 @@ interface RequestRow {
   id: string;
   owner_id: string;
   target_id: string;
-  note: string | null;
+  message: string | null;
   attempts: number;
   status: 'pending' | 'ignored' | 'blocked' | 'accepted';
 }
@@ -579,8 +608,7 @@ export type SendRequestOutcome = 'pending' | 'blocked' | 'already';
 export async function sendConnectRequestRemote(
   ownerId: string,
   targetId: string,
-  note: string | undefined,
-  met: MetContext | undefined,
+  message: string | undefined,
 ): Promise<SendRequestOutcome> {
   if (!supabase) throw new Error('Supabase is not configured');
   const { data: existing, error: readError } = await supabase
@@ -602,8 +630,7 @@ export async function sendConnectRequestRemote(
       id: row?.id,
       owner_id: ownerId,
       target_id: targetId,
-      note: note ?? null,
-      met_context: met ?? null,
+      message: message ?? null,
       attempts,
       status,
     },
@@ -619,13 +646,13 @@ export async function loadOutgoingRequests(ownerId: string): Promise<OutgoingReq
   try {
     const { data, error } = await supabase
       .from('requests')
-      .select('id, target_id, note, attempts, status')
+      .select('id, target_id, message, attempts, status')
       .eq('owner_id', ownerId);
     if (error) throw error;
-    return (data as Pick<RequestRow, 'id' | 'target_id' | 'note' | 'attempts' | 'status'>[]).map((r) => ({
+    return (data as Pick<RequestRow, 'id' | 'target_id' | 'message' | 'attempts' | 'status'>[]).map((r) => ({
       id: r.id,
       personId: r.target_id,
-      note: r.note ?? undefined,
+      message: r.message ?? undefined,
       attempts: r.attempts,
       status: r.status,
     }));
@@ -636,14 +663,14 @@ export async function loadOutgoingRequests(ownerId: string): Promise<OutgoingReq
 }
 
 /** This user's incoming requests, joined with the sender's preview (Home's "wants to connect" card). */
-export async function loadIncomingRequests(): Promise<{ id: string; note?: string; connection: Connection }[]> {
+export async function loadIncomingRequests(): Promise<{ id: string; message?: string; connection: Connection }[]> {
   if (!supabase) return [];
   try {
     const { data, error } = await supabase.rpc('list_incoming_requests');
     if (error) throw error;
-    return (data as { id: string; owner_id: string; name: string; avatar_bg: string | null; photo_url: string | null; note: string | null; met_context: MetContext | null }[]).map((r) => ({
+    return (data as { id: string; owner_id: string; name: string; avatar_bg: string | null; photo_url: string | null; message: string | null }[]).map((r) => ({
       id: r.id,
-      note: r.note ?? undefined,
+      message: r.message ?? undefined,
       connection: {
         id: r.owner_id,
         user: {
@@ -663,7 +690,6 @@ export async function loadIncomingRequests(): Promise<{ id: string; note?: strin
         },
         method: 'search',
         connectionType: 'friend',
-        metContext: r.met_context ?? undefined,
         sharedContactInfo: [],
         nudgeCadence: 'monthly',
         lastContacted: null,

@@ -52,8 +52,8 @@ HOW IT WORKS
   cadence you choose (weekly, monthly, quarterly — or never, your call).
 
 • Keep every connection organized — friend, professional contact,
-  acquaintance, or something more — with notes on where you met and how
-  you're staying in touch.
+  acquaintance, or something more — with private notes only you can see
+  and a record of how you're staying in touch.
 
 WHY KNOWABLE
 

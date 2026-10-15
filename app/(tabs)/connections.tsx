@@ -24,7 +24,6 @@ import {
   type,
 } from '../../src/theme';
 import { commonalityCount } from '../../src/engine/commonality';
-import { formatMetContext } from '../../src/engine/social';
 import { useStore } from '../../src/store/useStore';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -119,7 +118,6 @@ export default function ConnectionsScreen() {
                   <Text style={[type.cardTitle, { color: fg }]}>{c.user.name}</Text>
                   <Text style={[type.body, { color: muted }]} numberOfLines={1}>
                     {commonalityCount(me, c.user)} in common
-                    {formatMetContext(c.metContext) ? ` · ${formatMetContext(c.metContext)}` : ''}
                   </Text>
                 </View>
                 {showArchived ? (

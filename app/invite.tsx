@@ -25,8 +25,6 @@ export default function InviteScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [metLocation, setMetLocation] = useState('');
-  const [metEvent, setMetEvent] = useState('');
 
   const user = useStore((s) => s.user);
   const pending = useStore((s) => s.pendingConnections);
@@ -39,15 +37,9 @@ export default function InviteScreen() {
   const send = () => {
     if (!name.trim() || !phoneValid) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const met =
-      metLocation.trim() || metEvent.trim()
-        ? { location: metLocation.trim() || undefined, event: metEvent.trim() || undefined }
-        : undefined;
-    createPendingInvite(name.trim(), normalizedPhone, met);
+    createPendingInvite(name.trim(), normalizedPhone);
     setName('');
     setPhone('');
-    setMetLocation('');
-    setMetEvent('');
   };
 
   const messagePreview = `Hey! It’s ${user.name.split(' ')[0]} — connect with me on Knowable so we don’t lose touch: knowable.app/claim`;
@@ -101,24 +93,6 @@ export default function InviteScreen() {
             Include the country code, e.g. +1 555 123 4567
           </Text>
         )}
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TextInput
-            value={metLocation}
-            onChangeText={setMetLocation}
-            placeholder="Where'd you meet?"
-            placeholderTextColor={colors.textMutedOnLight}
-            accessibilityLabel="Where you met"
-            style={[inputStyle, { flex: 1, minWidth: 0 }]}
-          />
-          <TextInput
-            value={metEvent}
-            onChangeText={setMetEvent}
-            placeholder="Occasion (optional)"
-            placeholderTextColor={colors.textMutedOnLight}
-            accessibilityLabel="Occasion (optional)"
-            style={[inputStyle, { flex: 1, minWidth: 0 }]}
-          />
-        </View>
 
         {/* Pre-filled message preview (would open iMessage/SMS on device). */}
         <View style={{ backgroundColor: palette.offWhite, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>

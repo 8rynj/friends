@@ -15,8 +15,9 @@ SMS invite + claim), settings & privacy, and unit tests + CI. A **real
 multi-user Supabase backend** (normalized schema, `auth.uid()`-scoped RLS,
 passwordless phone auth) is built and opt-in via env vars, and connect
 **creation** (NFC bump, Search send/accept, SMS-invite claim) is now wired to
-that real backend too — see B0 below. Two V2 features (not-interested archive,
-structured "where you met") and the mutual-friends graph also already landed.
+that real backend too — see B0 below. The V2 not-interested archive and the
+mutual-friends graph also already landed. (V2 "where you met" landed too, but
+was later removed in favor of private per-connection notes — migration 0006.)
 The app runs on the iOS simulator/device.
 
 A remote **code-level QA pass** (1C) has since walked every flow, fixed the

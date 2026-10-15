@@ -7,8 +7,8 @@
  * offset shadow, and alternating taped commonality cards. Shows last-contacted
  * and next-nudge per the follow-up flow.
  */
-import React from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -21,8 +21,10 @@ import {
   Pill,
 } from '../../src/components';
 import {
+  border,
   cardBackgrounds,
   colors,
+  fonts,
   palette,
   spacing,
   textOn,
@@ -33,7 +35,7 @@ import { handleMeta } from '../../src/data/mock';
 import { HandleSource, NudgeCadence } from '../../src/data/types';
 import { computeCommonalities } from '../../src/engine/commonality';
 import { nudgeCopy } from '../../src/engine/nudges';
-import { computeMutuals, formatMetContext } from '../../src/engine/social';
+import { computeMutuals } from '../../src/engine/social';
 import { useStore } from '../../src/store/useStore';
 import { useReducedMotion } from '../../src/hooks/useReducedMotion';
 import { ConnectionType } from '../../src/data/types';
@@ -76,6 +78,29 @@ export default function ConnectionProfileScreen() {
   const archiveConnection = useStore((s) => s.archiveConnection);
   const unarchiveConnection = useStore((s) => s.unarchiveConnection);
   const toggleCrush = useStore((s) => s.toggleCrush);
+  const setNotes = useStore((s) => s.setNotes);
+
+  // Private notes are edited locally and committed on blur — and on unmount, in
+  // case the user backs out with the keyboard still up.
+  const [notesDraft, setNotesDraft] = useState(connection?.notes ?? '');
+  const notesRef = useRef(notesDraft);
+  notesRef.current = notesDraft;
+  const savedNotesRef = useRef(connection?.notes ?? '');
+  const saveNotes = () => {
+    if (!connection || notesRef.current === savedNotesRef.current) return;
+    savedNotesRef.current = notesRef.current;
+    setNotes(connection.id, notesRef.current);
+  };
+  const saveNotesRef = useRef(saveNotes);
+  saveNotesRef.current = saveNotes;
+  useEffect(() => () => saveNotesRef.current(), []);
+  // Pick up notes that arrive after mount (remote hydration) unless mid-edit.
+  const storedNotes = connection?.notes ?? '';
+  useEffect(() => {
+    if (notesRef.current !== savedNotesRef.current) return;
+    savedNotesRef.current = storedNotes;
+    setNotesDraft(storedNotes);
+  }, [storedNotes]);
 
   if (!connection) {
     return (
@@ -96,7 +121,6 @@ export default function ConnectionProfileScreen() {
   const commonalities = computeCommonalities(me, user, 5, connection.connectionType);
   // Real graph intersection — who's in both my connections and theirs (V2).
   const mutuals = computeMutuals(myConnections, connection);
-  const metWhere = formatMetContext(connection.metContext);
   const entrance = (i: number) =>
     reduced ? undefined : FadeInDown.delay(120 + i * 90).springify().damping(16);
 
@@ -109,7 +133,7 @@ export default function ConnectionProfileScreen() {
     <View style={{ flex: 1, backgroundColor: colors.appBg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         <Hero
-          eyebrow={`${connection.connectionType} · met via ${connection.method.toUpperCase()}`}
+          eyebrow={connection.connectionType}
           name={user.name}
           avatarColor={user.avatarColor}
           avatarPhoto={user.photo}
@@ -119,13 +143,6 @@ export default function ConnectionProfileScreen() {
         />
 
         <View style={{ paddingHorizontal: spacing.screen, paddingTop: spacing.lg, gap: spacing.lg }}>
-          {/* Where you met — structured location/event, captured at connect time (V2). */}
-          {metWhere && (
-            <Text style={[type.body, { color: colors.textMutedOnLight }]}>
-              Where you met: {metWhere}
-            </Text>
-          )}
-
           {/* Contact buttons — row of three (§8). Tapping logs confirmed
               outreach (stamps last-contacted, reschedules the next nudge) then
               deep-links into the platform (§5D). */}
@@ -168,6 +185,25 @@ export default function ConnectionProfileScreen() {
               </View>
             </View>
           </CollageCard>
+
+          {/* Private notes — the user's own memory aid; never shared with them. */}
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={[type.label, { color: colors.textMutedOnLight }]}>Notes</Text>
+              <Text style={[type.micro, { color: colors.textMutedOnLight }]}>Private · only you</Text>
+            </View>
+            <TextInput
+              value={notesDraft}
+              onChangeText={setNotesDraft}
+              onBlur={saveNotes}
+              placeholder={`Kids’ names, a book they recommended, what to ask ${user.name.split(' ')[0]} next time…`}
+              placeholderTextColor={colors.textMutedOnLight}
+              accessibilityLabel="Private notes"
+              multiline
+              textAlignVertical="top"
+              style={notesInputStyle}
+            />
+          </View>
 
           {/* Nudge cadence — per-connection follow-up frequency (§5D). */}
           <View style={{ gap: spacing.sm }}>
@@ -345,7 +381,6 @@ export default function ConnectionProfileScreen() {
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.navy }} />
                   <Text style={[type.body, { color: colors.nearBlack }]}>
                     {formatDate(entry.date)} · {entry.via}
-                    {entry.note ? ` — ${entry.note}` : ''}
                   </Text>
                 </View>
               ))}
@@ -402,6 +437,21 @@ export default function ConnectionProfileScreen() {
     </View>
   );
 }
+
+const notesInputStyle = {
+  fontFamily: fonts.medium,
+  fontSize: 15,
+  lineHeight: 21,
+  color: colors.nearBlack,
+  backgroundColor: palette.offWhite,
+  borderWidth: border.small,
+  borderColor: colors.border,
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  paddingTop: 11,
+  paddingBottom: 11,
+  minHeight: 96,
+} as const;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

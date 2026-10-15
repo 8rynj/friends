@@ -99,16 +99,37 @@ describe('setCadence', () => {
 
 describe('logOutreach', () => {
   it('stamps today, logs history, reschedules, and resolves open nudges', () => {
-    useStore.getState().logOutreach('marcus', 'imessage', 'caught up');
+    useStore.getState().logOutreach('marcus', 'imessage');
     const marcus = useStore.getState().connections.find((c) => c.id === 'marcus')!;
     expect(marcus.lastContacted).toBe(todayISO());
-    expect(marcus.contactHistory[0]).toMatchObject({ via: 'imessage', note: 'caught up' });
+    expect(marcus.contactHistory[0]).toMatchObject({ via: 'imessage', date: todayISO() });
     // Monthly cadence → next nudge is 30 days out, in the future.
     expect(isDue(marcus.nextNudge)).toBe(false);
     // The seeded "reach out to Marcus" nudge is now resolved.
     const nudge = useStore.getState().nudges.find((n) => n.id === 'n1')!;
     expect(nudge.response).toBe('reached_out');
     expect(nudge.due).toBe(false);
+  });
+});
+
+describe('setNotes', () => {
+  it('saves private notes on the connection', () => {
+    useStore.getState().setNotes('sarah', 'Ask about the Tahoe trip');
+    const sarah = useStore.getState().connections.find((c) => c.id === 'sarah')!;
+    expect(sarah.notes).toBe('Ask about the Tahoe trip');
+  });
+
+  it('clears notes when set to blank', () => {
+    useStore.getState().setNotes('sarah', 'temp');
+    useStore.getState().setNotes('sarah', '   ');
+    const sarah = useStore.getState().connections.find((c) => c.id === 'sarah')!;
+    expect(sarah.notes).toBeUndefined();
+  });
+
+  it('only touches the targeted connection', () => {
+    useStore.getState().setNotes('sarah', 'hi');
+    const others = useStore.getState().connections.filter((c) => c.id !== 'sarah');
+    expect(others.every((c) => c.notes === undefined)).toBe(true);
   });
 });
 

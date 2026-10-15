@@ -44,6 +44,8 @@ one-time verification code by SMS via our SMS provider). Once signed in:
 - Your data is scoped to your account only (row-level security keyed to your
   user id) — other users can only see what you've explicitly shared with
   them as part of a connection.
+- **Private notes** you write about a connection are visible only to you.
+  They're never shown or sent to that person.
 - **We do not access your device's address book / contacts.** The SMS invite
   feature only uses a phone number you type in yourself for the person
   you're inviting; Knowable never reads or uploads your phone's contact

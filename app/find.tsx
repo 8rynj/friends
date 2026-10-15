@@ -29,9 +29,7 @@ export default function FindScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [note, setNote] = useState('');
-  const [metLocation, setMetLocation] = useState('');
-  const [metEvent, setMetEvent] = useState('');
+  const [message, setMessage] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
   const [results, setResults] = useState<DirectoryResult[]>([]);
 
@@ -58,11 +56,7 @@ export default function FindScreen() {
 
   const send = async (id: string, name: string) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-    const met =
-      metLocation.trim() || metEvent.trim()
-        ? { location: metLocation.trim() || undefined, event: metEvent.trim() || undefined }
-        : undefined;
-    const res = await sendConnectRequest(id, note.trim() || undefined, met);
+    const res = await sendConnectRequest(id, message.trim() || undefined);
     if (res.outcome === 'accepted') {
       router.push(`/icebreaker?id=${res.connectionId}`);
     } else if (res.outcome === 'pending') {
@@ -127,29 +121,13 @@ export default function FindScreen() {
           style={inputStyle}
         />
         <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="Add a note (optional)"
+          value={message}
+          onChangeText={setMessage}
+          placeholder="Add a message (optional)"
           placeholderTextColor={colors.textMutedOnLight}
-          accessibilityLabel="Add a note (optional)"
+          accessibilityLabel="Add a message (optional)"
           style={inputStyle}
         />
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TextInput
-            value={metLocation}
-            onChangeText={setMetLocation}
-            placeholder="Where'd you meet?"
-            placeholderTextColor={colors.textMutedOnLight}
-            style={[inputStyle, { flex: 1, minWidth: 0 }]}
-          />
-          <TextInput
-            value={metEvent}
-            onChangeText={setMetEvent}
-            placeholder="Occasion (optional)"
-            placeholderTextColor={colors.textMutedOnLight}
-            style={[inputStyle, { flex: 1, minWidth: 0 }]}
-          />
-        </View>
 
         {flash && (
           <View style={{ backgroundColor: palette.orange, borderRadius: radii.card, borderWidth: border.small, borderColor: colors.border, padding: 12 }}>
