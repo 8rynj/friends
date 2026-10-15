@@ -124,9 +124,22 @@ server/
   connection type (friend/professional/acquaintance/romantic).
 - **Store (`src/store/useStore.ts`)** seeds from `src/data/mock.ts`, persists a
   subset, and is the backbone backend/auth/NFC will plug into. Bump the persist
-  `name` version when the persisted shape changes (currently `knowable-store-v8`).
+  `name` version when the persisted shape changes (currently `knowable-store-v9`).
   Auth session state lives separately in `src/store/useAuthStore.ts` (mirrors
   Supabase's session, not app/profile data).
+- **Private notes are private — a hard rule.** `Connection.notes` belongs only
+  to the user who wrote it. Never show it to the other person or put it in
+  anything they can receive: shared profiles, connect requests, icebreakers,
+  commonality/nudge inputs, mutuals, push payloads, exports, or any RPC/API
+  response other than the author's own. Remotely it lives only in
+  `connection_notes`, whose RLS is owner-only — never move it onto
+  `connection_members` (the other side can read that row) or read it from a
+  `security definer` function. The text sent with a connect request is a
+  **message** (`OutgoingRequest.message` / `IncomingRequest.message`,
+  `requests.message`) — never call it a note.
+- **We don't collect where people met.** The V2 "where you met" feature was
+  removed (`supabase/migrations/0006_notes_drop_met_context.sql` drops
+  `met_context`); don't reintroduce it — private notes cover that need.
 - **NFC tap-to-connect (`src/nfc/tapConnect.ts`)** wraps `react-native-nfc-manager`;
   every export is `Platform.OS === 'web'`-guarded so the native module is never
   required on web (would crash — RNW has no `NativeModules.NfcManager`). `app/add.tsx`
@@ -227,8 +240,8 @@ not a demo.
 **Setup:**
 
 1. Create a project at supabase.com (or use an existing one).
-2. In the SQL editor, run `supabase/migrations/0001_baseline.sql` then
-   `supabase/migrations/0002_extend.sql`, in order. Both are idempotent
+2. In the SQL editor, run every file in `supabase/migrations/` in order
+   (`0001_baseline.sql` through `0006_notes_drop_met_context.sql`). They're idempotent
    (`create table if not exists`, `create or replace function`, drop-then-create
    for policies) — safe to re-run.
 3. Copy `.env.example` to `.env.local` and fill in `EXPO_PUBLIC_SUPABASE_URL` /
@@ -241,7 +254,8 @@ not a demo.
 user — `handle_new_user()` auto-creates a stub on signup), `connections` (one
 canonical row per pair, `user_a < user_b`), `connection_members` (the per-side
 view — type/cadence/sharing/archive/outreach state, since two people can see
-the same connection differently), `contact_log`, `handles`, `nudges`,
+the same connection differently), `connection_notes` (private notes, owner-only
+RLS), `contact_log`, `handles`, `nudges`,
 `pending_connections` (SMS-invite tokens), `requests` (Search send/accept
 handshake). Multi-table invariants go through `security definer` RPCs rather
 than raw client writes: `confirm_connection` (create/find a connection, seed
@@ -267,7 +281,8 @@ cadence), `accept_request`, `search_profiles`.
   wholesale**: they can only be populated by a real counterpart going through
   `confirm_connection`, so the repository never manufactures them from local/mock
   state. Per-action edits push their specific change instead (cadence/type/archived
-  → `connection_members` update; `logOutreach` → the RPC; `respondToNudge` →
+  → `connection_members` update; `setNotes` → `connection_notes` upsert/delete;
+  `logOutreach` → the RPC; `respondToNudge` →
   `nudges` update; new/cancelled invites → `pending_connections` insert/delete).
   `profiles` (this user's own row) is the exception and stays a full push-on-change
   mirror, upserted on first load if missing.
@@ -287,7 +302,8 @@ cadence), `accept_request`, `search_profiles`.
   `supabase/migrations/0003_connect_creation.sql` for the RPCs
   (`get_profile_preview`, `list_incoming_requests`,
   `preview_pending_connection`, `claim_pending_connection`, plus
-  `confirm_connection`/`accept_request` gaining `method`/`met_context`). Each
+  `confirm_connection`/`accept_request` gaining `method`; 0006 later dropped
+  their `met_context`). Each
   action falls back to the local mock pool (`src/data/mock.ts`) when
   `activeOwnerId` is unset (Supabase not configured, or signed out) — the
   offline/demo experience is unchanged. A real connect needs a **second real
@@ -451,9 +467,10 @@ pushes for anything due.
 
 ## Git / workflow
 
-- All prior parallel feature branches have been consolidated onto `main`.
-  Work directly against `main` (or a short-lived feature branch off it) going
-  forward.
+- `main` is the base. Start each change on a fresh branch from the latest
+  `main` (fetch first — check `git log HEAD..origin/main` is empty, not just
+  `origin/main..HEAD`) and open one PR per change into `main`; CI must be green
+  before merging.
 - Commit + push when a unit of work is done and verified. Keep sessions scoped to
   one milestone; start a fresh session for the next (the repo is the context).
 

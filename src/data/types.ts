@@ -82,14 +82,6 @@ export type ConnectionType =
 /** How a connection was first captured (Spec §5B). */
 export type ConnectionMethod = 'nfc' | 'sms' | 'search';
 
-/** Where/when a connection was first met — structured location + event (V2, Spec §5B/§8). */
-export interface MetContext {
-  /** Physical or virtual place, e.g. "Climbing gym". */
-  location?: string;
-  /** Occasion/event, e.g. "Saturday group ride". */
-  event?: string;
-}
-
 /** A single shared point of common ground surfaced as an icebreaker (§3, §5B). */
 export interface Commonality {
   id: string;
@@ -162,7 +154,6 @@ export interface ContactLogEntry {
   date: string; // ISO date
   /** Which platform the outreach happened on. */
   via: HandleSource | 'imessage' | 'phone';
-  note?: string;
 }
 
 /** Per-connection nudge cadence (§5D Ongoing Management). */
@@ -174,8 +165,11 @@ export interface Connection {
   user: User;
   method: ConnectionMethod;
   connectionType: ConnectionType;
-  /** Where/when first met — structured location + event, captured at connect time (V2). */
-  metContext?: MetContext;
+  /**
+   * Private notes about this person. Only ever visible to the user who wrote
+   * them — never sent to or readable by the other side (see CLAUDE.md).
+   */
+  notes?: string;
   /** Contact info this user has chosen to share back (asymmetrical, §5B). */
   sharedContactInfo: HandleSource[];
   /**
@@ -218,8 +212,6 @@ export interface PendingConnection {
   createdAt: string; // ISO date
   expiresAt: string; // ISO date (createdAt + 30 days)
   method: ConnectionMethod;
-  /** V2: where/when they met, captured by the inviter and carried onto the claimed connection. */
-  metContext?: MetContext;
   /**
    * Opaque claim-link token (`pending_connections.token`) — only set once a
    * real Supabase backend is configured. The claim screen looks the invite up
@@ -239,7 +231,8 @@ export type RequestStatus = 'pending' | 'ignored' | 'blocked' | 'accepted';
 export interface OutgoingRequest {
   id: string;
   personId: string;
-  note?: string;
+  /** Message sent to the person with the request (visible to them). */
+  message?: string;
   attempts: number;
   status: RequestStatus;
 }
@@ -248,5 +241,6 @@ export interface OutgoingRequest {
 export interface IncomingRequest {
   id: string;
   connection: Connection;
-  note?: string;
+  /** Message the requester sent with the request. */
+  message?: string;
 }

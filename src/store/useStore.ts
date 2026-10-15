@@ -17,7 +17,6 @@ import {
   DataPullSource,
   HandleSource,
   IncomingRequest,
-  MetContext,
   NudgeCadence,
   NudgeResponse,
   OutgoingRequest,
@@ -168,13 +167,18 @@ interface AppState {
   addConnection: (c: Connection) => void;
   isConnected: (id: string) => boolean;
   /** Record confirmed outreach: stamps lastContacted, logs history, reschedules. */
-  logOutreach: (connectionId: string, via: ContactLogEntry['via'], note?: string) => void;
+  logOutreach: (connectionId: string, via: ContactLogEntry['via']) => void;
   /** Respond to a nudge's "did you reach out?" prompt (§5D). */
   respondToNudge: (nudgeId: string, response: NudgeResponse) => void;
   /** Change a connection's nudge cadence and reschedule the next nudge. */
   setCadence: (connectionId: string, cadence: NudgeCadence) => void;
   /** Set a connection's type (filters icebreakers, sharing, nudge copy — V1.5). */
   setConnectionType: (connectionId: string, type: ConnectionType) => void;
+  /**
+   * Replace a connection's private notes. Owner-only: synced to the
+   * `connection_notes` table, whose RLS never lets the other side read it.
+   */
+  setNotes: (connectionId: string, notes: string) => void;
   /** Mark "not interested": hides from Home/People and pauses nudges (V2). Reversible. */
   archiveConnection: (connectionId: string) => void;
   /** Undo an archive — restores default cadence and resumes nudges (V2). */
@@ -199,7 +203,7 @@ interface AppState {
   /** Search the directory by name (real `search_profiles` RPC when signed into a real backend, else the local mock pool). */
   searchDirectory: (query: string) => Promise<{ id: string; name: string; avatarColor?: string; photo?: string }[]>;
   /** Send a connect request to a directory person; resolves by disposition. */
-  sendConnectRequest: (personId: string, note?: string, met?: MetContext) => Promise<RequestOutcome>;
+  sendConnectRequest: (personId: string, message?: string) => Promise<RequestOutcome>;
   /** Accept an incoming request → becomes a connection. Returns its id. */
   acceptIncoming: (requestId: string) => Promise<string | undefined>;
   /** Ignore an incoming request. */
@@ -209,7 +213,7 @@ interface AppState {
   /** Create the connection from a confirmed NFC bump. Returns the connection id. */
   confirmNfcConnection: (candidate: CandidatePreview) => Promise<string | undefined>;
   /** Create an SMS invite (pending, 30-day expiry). Returns the pending id. */
-  createPendingInvite: (name: string, phone: string, met?: MetContext) => string;
+  createPendingInvite: (name: string, phone: string) => string;
   /** Claim a pending invite → confirmed connection, tagged with the claimant's verified phone. Returns the connection id. */
   claimPending: (pendingId: string, claimantPhone?: string) => string | undefined;
   /** Claim a pending invite by its claim-link token (the real cross-device path — Spec §5C). Returns the connection id. */
@@ -272,10 +276,10 @@ export const useStore = create<AppState>()(
 
       isConnected: (id) => get().connections.some((c) => c.id === id),
 
-      logOutreach: (connectionId, via, note) => {
+      logOutreach: (connectionId, via) => {
         const today = todayISO();
         set((s) => {
-          const entry: ContactLogEntry = { id: genId(), date: today, via, note };
+          const entry: ContactLogEntry = { id: genId(), date: today, via };
           const connections = s.connections.map((c) =>
             c.id === connectionId
               ? {
@@ -341,6 +345,16 @@ export const useStore = create<AppState>()(
             c.id === connectionId ? { ...c, connectionType: type } : c,
           ),
         })),
+
+      setNotes: (connectionId, notes) => {
+        const value = notes.trim() ? notes : undefined;
+        set((s) => ({
+          connections: s.connections.map((c) =>
+            c.id === connectionId ? { ...c, notes: value } : c,
+          ),
+        }));
+        if (activeOwnerId) repository.saveConnectionNotesRemote(activeOwnerId, connectionId, value ?? '');
+      },
 
       archiveConnection: (connectionId) =>
         set((s) => ({
@@ -431,13 +445,13 @@ export const useStore = create<AppState>()(
           .map((d) => ({ id: d.id, name: d.user.name, avatarColor: d.user.avatarColor, photo: d.user.photo }));
       },
 
-      sendConnectRequest: async (personId, note, met) => {
+      sendConnectRequest: async (personId, message) => {
         const s = get();
         if (s.connections.some((c) => c.id === personId)) return { outcome: 'already' };
 
         if (activeOwnerId) {
           try {
-            const status = await repository.sendConnectRequestRemote(activeOwnerId, personId, note, met);
+            const status = await repository.sendConnectRequestRemote(activeOwnerId, personId, message);
             const outgoingRequests = await repository.loadOutgoingRequests(activeOwnerId);
             set({ outgoingRequests });
             return { outcome: status };
@@ -457,7 +471,7 @@ export const useStore = create<AppState>()(
         if (searchIgnorers.includes(personId)) {
           const attempts = (existing?.attempts ?? 0) + 1;
           const status: OutgoingRequest['status'] = attempts >= 3 ? 'blocked' : 'ignored';
-          const req: OutgoingRequest = { id: existing?.id ?? genId(), personId, note, attempts, status };
+          const req: OutgoingRequest = { id: existing?.id ?? genId(), personId, message, attempts, status };
           set((st) => ({
             outgoingRequests: existing
               ? st.outgoingRequests.map((r) => (r.personId === personId ? req : r))
@@ -468,7 +482,6 @@ export const useStore = create<AppState>()(
 
         const connection: Connection = {
           ...person,
-          metContext: met ?? { event: 'Connected via search' },
           nudgeCadence: s.settings.defaultCadence,
         };
         set((st) => ({
@@ -553,7 +566,7 @@ export const useStore = create<AppState>()(
         return full.id;
       },
 
-      createPendingInvite: (name, phone, met) => {
+      createPendingInvite: (name, phone) => {
         const id = genId();
         const today = todayISO();
         const pending: PendingConnection = {
@@ -563,7 +576,6 @@ export const useStore = create<AppState>()(
           createdAt: today,
           expiresAt: addDaysISO(today, 30),
           method: 'sms',
-          metContext: met,
           // Generated client-side (not server-side) so it's usable as the shareable
           // claim link the moment the invite is created, before the Supabase push resolves.
           token: genId(),
@@ -615,7 +627,6 @@ export const useStore = create<AppState>()(
           },
           method: 'sms',
           connectionType: 'friend',
-          metContext: pending.metContext ?? { event: 'Joined from your invite' },
           sharedContactInfo: [],
           nudgeCadence: 'monthly',
           lastContacted: null,
@@ -652,10 +663,9 @@ export const useStore = create<AppState>()(
       setPushToken: (token) => set({ pushToken: token }),
     }),
     {
-      // Bumped to v8 for pushToken, on top of v7's User.phone (passwordless
-      // phone auth) and v6's structured metContext (location/event) +
-      // graph-based mutuals.
-      name: 'knowable-store-v8',
+      // Bumped to v9: dropped metContext, added private Connection.notes,
+      // request `note` → `message`. (v8: pushToken; v7: User.phone.)
+      name: 'knowable-store-v9',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         onboarded: s.onboarded,

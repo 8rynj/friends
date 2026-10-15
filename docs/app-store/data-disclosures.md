@@ -31,16 +31,16 @@ vars set, most rows can be answered "Data Not Collected."
 |---|---|---|---|---|---|---|
 | Contact Info | Phone Number | Yes (if backend enabled) | Yes | No | App Functionality (sign-in) | Passwordless OTP sign-in via Supabase Auth + Twilio. Not shared/sold. |
 | Contact Info | Name | Yes (if backend enabled) | Yes | No | App Functionality | Profile display name, self-entered. |
-| Contact Info | Physical Address | No | — | — | — | "Where you met" is free text about the meeting, not a mailing address. |
+| Contact Info | Physical Address | No | — | — | — | No mailing address collection anywhere in the app. |
 | Contact Info | Email Address | No | — | — | — | No email collection anywhere in the app today. |
 | User Content | Photos or Videos | No | — | — | — | No camera/photo-library access anywhere in the app. |
-| User Content | Other User Content | Yes (if backend enabled) | Yes | No | App Functionality | Profile facets (hobbies, bucket list, certs, travel, life experiences) and connection notes, synced only when signed in. |
+| User Content | Other User Content | Yes (if backend enabled) | Yes | No | App Functionality | Profile facets (hobbies, bucket list, certs, travel, life experiences) and private connection notes (visible only to their author), synced only when signed in. |
 | Identifiers | User ID | Yes (if backend enabled) | Yes | No | App Functionality | Supabase `auth.uid()` — required for owner-scoped access control (RLS). |
 | Identifiers | Device ID | Yes (if push enabled) | Yes | No | App Functionality | Expo push token, used only to route opted-in notifications. |
 | Usage Data | Product Interaction | Yes (if PostHog enabled) | Yes (session-linked) | No | Analytics | 4 product events only: connect made, nudge acted on, data-pull connected, onboarding completed. No ad targeting. |
 | Diagnostics | Crash Data | Yes (if Sentry enabled) | Pseudonymous | No | App Functionality (bug fixing) | Standard crash/error reports. |
 | Contacts | (device address book) | **No** | — | — | — | App never requests `NSContactsUsageDescription` / Contacts permission. Do not declare this. |
-| Location | Precise/Coarse Location | No | — | — | — | "Where you met" fields are free-text, not device location services. |
+| Location | Precise/Coarse Location | No | — | — | — | No device location services and no where-you-met fields. |
 | Financial Info | any | No | — | — | — | No payments/subscriptions in this app. |
 | Health & Fitness | Fitness | Only if user connects Strava | Yes | No | App Functionality | Strava OAuth returns recent activity *types* only (e.g. "Trail running"), used purely as an icebreaker signal — not full workout data. |
 | Other Data Types | Other (music/media taste) | Only if user connects Spotify/Letterboxd/Goodreads | Yes | No | App Functionality | Top artists/genres (Spotify OAuth), favorite films (Letterboxd public RSS), favorite/currently-reading books (Goodreads public RSS). |

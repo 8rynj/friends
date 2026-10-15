@@ -1,16 +1,8 @@
 /**
- * Social graph helpers (V2) — formatting the structured "where you met"
- * context and computing mutual friends from real connection edges instead of
- * a hand-authored list (Spec §8).
+ * Social graph helpers (V2) — computing mutual friends from real connection
+ * edges instead of a hand-authored list (Spec §8).
  */
-import { Connection, MetContext } from '../data/types';
-
-/** Renders a structured met-context as a short display string, e.g. "Saturday group ride · Trail running club". */
-export function formatMetContext(mc?: MetContext): string | undefined {
-  if (!mc) return undefined;
-  const parts = [mc.event, mc.location].filter((p): p is string => !!p?.trim());
-  return parts.length ? parts.join(' · ') : undefined;
-}
+import { Connection } from '../data/types';
 
 /** A mutual connection surfaced on a profile. */
 export interface Mutual {

@@ -100,13 +100,12 @@ export const connections: Connection[] = [
     },
     method: 'nfc',
     connectionType: 'friend',
-    metContext: { location: 'Trail running club', event: 'Saturday meetup' },
     sharedContactInfo: ['instagram', 'strava'],
     nudgeCadence: 'monthly',
     lastContacted: '2026-06-10',
     nextNudge: '2026-06-28',
     contactHistory: [
-      { id: 'h1', date: '2026-06-10', via: 'instagram', note: 'Sent her a trail rec' },
+      { id: 'h1', date: '2026-06-10', via: 'instagram' },
       { id: 'h2', date: '2026-05-22', via: 'strava' },
     ],
   },
@@ -135,7 +134,6 @@ export const connections: Connection[] = [
     },
     method: 'sms',
     connectionType: 'friend',
-    metContext: { event: 'Dinner party', location: 'Dana’s place' },
     sharedContactInfo: ['instagram', 'spotify'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -167,7 +165,6 @@ export const connections: Connection[] = [
     },
     method: 'search',
     connectionType: 'acquaintance',
-    metContext: { location: 'Climbing gym' },
     sharedContactInfo: ['instagram'],
     nudgeCadence: 'quarterly',
     lastContacted: '2026-05-01',
@@ -204,7 +201,6 @@ export const connections: Connection[] = [
     },
     method: 'nfc',
     connectionType: 'friend',
-    metContext: { event: 'Indie show', location: 'Baby’s All Right' },
     sharedContactInfo: ['instagram', 'bandsintown'],
     nudgeCadence: 'weekly',
     lastContacted: '2026-06-20',
@@ -266,7 +262,6 @@ export const newCandidates: Connection[] = [
     },
     method: 'nfc',
     connectionType: 'friend',
-    metContext: { event: 'Saturday group ride' },
     sharedContactInfo: ['strava', 'instagram'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -301,7 +296,6 @@ export const newCandidates: Connection[] = [
     },
     method: 'nfc',
     connectionType: 'friend',
-    metContext: { event: 'Book club' },
     sharedContactInfo: ['instagram', 'goodreads'],
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -317,7 +311,6 @@ function directoryPerson(user: User): Connection {
     user,
     method: 'search',
     connectionType: 'friend',
-    metContext: { event: 'Found on Knowable' },
     sharedContactInfo: user.handles.map((h) => h.source).slice(0, 3),
     nudgeCadence: 'monthly',
     lastContacted: null,
@@ -391,10 +384,10 @@ export const directory: Connection[] = [
 export const searchIgnorers: string[] = ['liam'];
 
 /** Seed incoming connect requests the user can accept or ignore (§5B). */
-export const incomingRequestsSeed: { id: string; connection: Connection; note?: string }[] = [
+export const incomingRequestsSeed: { id: string; connection: Connection; message?: string }[] = [
   {
     id: 'req-jess',
-    note: 'We met at the climbing gym — let’s connect!',
+    message: 'We met at the climbing gym — let’s connect!',
     connection: directoryPerson({
       id: 'jess',
       name: 'Jess Park',
